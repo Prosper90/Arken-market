@@ -1332,6 +1332,15 @@ const Onboarding = () => {
   const handleonboardStep = (step) => {
     checkTelegramId();
     getBalance();
+    if (step === 2) {
+      // If user has already seen the fund popup, go straight to markets
+      if (localStorage.getItem("hasSeenFundPopup") === "true") {
+        navigate("/markets");
+        return;
+      }
+      // First time — mark it so next visit skips it
+      localStorage.setItem("hasSeenFundPopup", "true");
+    }
     if (onboardStep < 3) {
       setOnboardStep(step);
     }
@@ -2145,24 +2154,27 @@ const Onboarding = () => {
 
   const connectWallet = async (key) => {
     try {
-      console.log(key, "key==");
-      // connectMetaMask()
-      // return
-      console.log(
-        isConnected || (Address && walletaccess),
-        isConnected,
-        Address,
-        walletaccess,
-      );
+      setwalletLoading(key);
+      setloadstatus(true);
       if (key === "metamask") return handleMetaMaskConnect("metamask");
       if (key === "coinbase") return connectWalletnew("phantom");
       if (key === "phantom") return handlePhantomConnect("phantom");
       if (key === "solflare") return handleSolflareConnect("solflare");
       if (key === "newwallet") return createNewWallet("newwallet");
     } catch (err) {
+      setloadstatus(false);
+      setwalletLoading(null);
       console.error("Wallet connect error:", err);
     }
   };
+
+  // Clear spinner once wallet is confirmed connected
+  useEffect(() => {
+    if (walletaccess) {
+      setloadstatus(false);
+      setwalletLoading(null);
+    }
+  }, [walletaccess]);
   const [selectNetwork, setSelectNetwork] = useState("");
   const [ChoosewalletStatus, setChoosewalletStatus] = useState(false);
 

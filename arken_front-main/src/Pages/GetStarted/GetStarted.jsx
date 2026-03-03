@@ -69,8 +69,6 @@ const [initDatanew, setinitData] = useState(null);
 
   const handleNavigate = () => {
     Navigation("/onBoarding")
-    localStorage.setItem("walletAddress","")    
-    // localStorage.clear()
   }
 
 
@@ -143,6 +141,12 @@ const authenticateTelegramUser = async () => {
       setTelegramUser(resp.data);
       localStorage.setItem("telegramUser", JSON.stringify(resp.data));
       console.log("Telegram user authenticated:", resp.data);
+      // If wallet already connected, skip onboarding entirely
+      const savedWallet = localStorage.getItem("walletAddress");
+      if (savedWallet) {
+        Navigation("/markets");
+        return;
+      }
     } else {
       console.error(resp.message);
     }
