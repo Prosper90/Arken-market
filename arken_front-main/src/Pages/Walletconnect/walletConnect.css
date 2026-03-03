@@ -1,0 +1,171 @@
+@import url('https://fonts.cdnfonts.com/css/satoshi');
+
+
+:root {
+    --satoshiFont : 'Satoshi', sans-serif;
+    --white : #fff;
+    --black : #000;
+    --secText : #A1A1A2;
+}
+
+.getStrt_wrp_main{
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.getStrt_header{
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+}
+
+.getStrt_header > img {
+    width: 102px;
+    height: 60px;
+}
+
+.getStrt_header > h2 {
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    text-align: center;
+}
+
+.getStrt_bdy_wrp{
+    margin-top: 4vh;
+    display: flex;
+    flex-direction: column;
+    gap: 29px;
+    width: 100%;
+}
+
+.getStrt_countWrp{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(19, 20, 23, 20%);
+    border-radius: 15px;
+    width: 100%;
+    /* display: grid; */
+    /* grid-template-columns: repeat(4, minmax(auto, 1fr)); */
+    background: rgb(19 20 23);
+    justify-content: space-evenly;
+  
+}
+
+.getStrt_countItm{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* width: calc(25% - (10px/2)); */
+}
+
+.getStrt_countItm > h6{
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    color: var(--white);
+    margin-bottom: 5px;
+}
+
+.getStrt_countItm > p{
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    color: var(--secText);
+    margin-bottom: 0px;
+}
+
+.getStrt_optLst_Wrp{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    background: rgba(19, 20, 23, 20%);
+    border-radius: 15px;
+    width: 100%;
+    background: rgb(19 20 23);
+    justify-content: space-evenly;
+}
+
+.getStrt_optLst_itm{
+    display: flex;
+    align-items: flex-start;
+}
+
+.gst_optlst_imgWrp{
+    display: flex;
+    align-items: center;
+    justify-content: center;    
+}
+
+.getStrt_optLst_itm:nth-child(1) .gst_optlst_imgWrp{
+    background: rgba(48, 74, 255, 30%);
+}
+
+.getStrt_optLst_itm:nth-child(2) .gst_optlst_imgWrp{
+    background: rgba(255, 48, 252, 30%);
+}
+
+.getStrt_optLst_itm:nth-child(3) .gst_optlst_imgWrp{
+    background: rgba(1, 205, 219, 30%);
+}
+
+.getStrt_optLst_itm:nth-child(4) .gst_optlst_imgWrp {
+    background: rgba(1, 219, 27, 30%);
+}
+
+.getStrt_optLst_cnt{
+    display: flex;
+    flex-direction: column;
+}
+
+.getStrt_optLst_cnt > h6 {
+    color: var(--white);
+    font-weight: bold;
+    font-family: var(--satoshiFont);
+    margin-bottom: 0;
+}
+
+.getStrt_optLst_cnt > p {
+    color: var(--secText);
+    font-weight: 400;
+    font-family: var(--satoshiFont);
+    margin-bottom: 0;
+}
+
+.getstrt_tickIconWrp{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.getstrt_tickIconWrp > p {
+    margin-bottom: 0;
+    color: var(--white);
+    font-weight: 400;
+    font-family: var(--satoshiFont);
+}
+
+.getStrt_btn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    background: linear-gradient(to bottom right , #7F3BED 0% ,#3114A6 100%);
+    width: 100%;
+    max-width: 500px;
+    border: none;
+    font-weight: 500;
+}
+
+.getStrt_btmPara{
+    margin-bottom: 0;
+    color: var(--white);
+    font-weight: 400;
+    font-family: var(--satoshiFont);
+    opacity: 50%;
+}

@@ -1,0 +1,248 @@
+@import url('https://fonts.cdnfonts.com/css/satoshi');
+
+@font-face {
+  font-family: 'mbfFont'; 
+  src: url('../../assets/font/mbfFont/MBFCannoRegular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+
+
+:root {
+    --satoshiFont : 'Satoshi', sans-serif;
+    --white : #fff;
+    --black : #000000;
+    --secText : #A1A1A2;
+    --accentColor: #304AFF;
+    --navbar: #0B0C0F;
+    --accentGreen: #34C759;
+    --accentRed: #FF383C;
+}
+
+
+.kol_klPrd_wrp{
+    display: flex;
+    width: 100%;
+    align-items: center;
+    border-radius: 19px;
+    /* background: linear-gradient(to bottom right , #7F3BED 0% , #3114A6 100%); */
+    background: url('../../assets/image/kol_bak_img.webp');
+    background-size: cover;
+    /* background-repeat: round; */
+}
+
+.kol_klPrd_cnt{
+    display: flex;
+    flex-direction: column;
+}
+
+.kol_klPrd_cnt > h5 {
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    color: var(--white);
+    margin-bottom: 4px;
+}
+
+.kol_klPrd_cnt > p {
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 0px;
+}
+
+.kol_klPrd_wrp > svg{
+    color: var(--white);
+}
+
+/*  */
+
+.kol_whtlrn_wrp{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    position: relative;
+    border-radius: 10px;
+    background: #07041A;
+}
+
+.kol_whtlrn_wrp > h6 {
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 0;
+}
+
+.kol_whtlrn_icon{
+    margin-left: auto;
+    color: var(--white);
+}
+
+.kol_whtlrn_icon > svg{
+    position: relative;
+    bottom: 2px;
+}
+
+.kol_actvprd_wrp{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.kol_actv_tpcnt{
+    display: flex;
+    width: 100%;
+    border-bottom: 1px solid rgba(225, 225, 225, 10%);
+}
+
+.kol_actv_tpcnt > h4 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.kol_actvprd_row{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.kol_actvprd_col{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    border-radius: 15px;
+    background: linear-gradient(to bottom right , #131417 0% , #333C59 100%);
+}
+
+.kol_actv_colTop{
+    display: flex;
+    align-items: center;
+}
+
+.kol_actv_colTpImgWrp{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.kol_actvprd_row > .kol_actvprd_col:nth-child(odd) .kol_actv_colTpImgWrp{
+    background: linear-gradient(to bottom , #FF30EA 0% , #991D8D 100%);
+} 
+
+.kol_actvprd_row > .kol_actvprd_col:nth-child(even) .kol_actv_colTpImgWrp{
+    background: linear-gradient(to bottom right , #3083FF 0% , #1D4E99 100%);
+} 
+
+.kol_actv_colTpImgWrp > img {
+    display: flex;
+}
+
+.kol_actv_colTpCnt {
+    display: flex;
+    flex-direction: column;
+}
+
+.kol_actv_colTpCnt > h5 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.kol_actv_colTpCnt > p {
+    color: var(--secText);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.kol_tab_CountWrp{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: auto;
+    justify-content: space-between;
+}
+
+.kol_tab_Countitm{
+    display: flex;
+    flex-direction: column;
+}
+
+.kol_tab_CountHed{
+    display: flex;
+    align-items: center;
+    color: var(--secText);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.kol_tab_CountPara{
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.kol_predct_wrp{
+    display: flex;
+    align-items: center;
+}
+
+.kol_predct_wrp > h6{
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 600;
+    margin-bottom: 0;
+}
+
+.kol_predct_wrp > h6 > span {
+    font-weight: 400;
+}
+
+.kol_act_Btnwrp{
+    display: flex;
+    align-items: center;
+}
+
+.kol_act_Btn{
+    display: flex;
+    align-items: center;
+    border-radius: 5px;
+    border: none;
+    width: 50%;
+}
+
+.kol_act_BtnYes{
+    background: var(--accentRed);
+}
+
+.kol_act_BtnNo{
+    background: var(--accentGreen);
+}
+
+.kol_act_BtnCnt{
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.kol_act_BtnCnt > h5 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+    margin-top: 0;
+}
+
+.kol_act_BtnCnt > h6 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+    margin-top: 0;
+}

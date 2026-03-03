@@ -1,0 +1,268 @@
+@import url('https://fonts.cdnfonts.com/css/satoshi');
+
+@font-face {
+  font-family: 'mbfFont'; 
+  src: url('../../assets/font/mbfFont/MBFCannoRegular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+
+
+:root {
+    --satoshiFont : 'Satoshi', sans-serif;
+    --white : #fff;
+    --black : #000000;
+    --secText : #A1A1A2;
+    --accentColor: #304AFF;
+    --navbar: #0B0C0F;
+    --accentGreen: #34C759;
+    --accentRed: #FF383C;
+    --card: #131417;
+}
+
+.wllt_top_cntWrp{
+    display: flex;
+    align-items: center;
+    border-radius: 19px;
+    width: 100%;
+    /* background: linear-gradient(to bottom right , #21C7F4 0% , #3114A6 100%); */
+    background: url('../../assets/image/wllet_backImg.webp');
+    background-size: cover;
+    /* background-repeat: round; */
+}
+
+.wllt_top_cnt{
+    display: flex;
+    flex-direction: column;
+}
+
+.wllt_top_cnt > h5 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.wllt_top_cnt > p {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.wllt_top_cntWrp > img {
+    margin-left: auto;
+}
+
+.wllt_balnc_cntWrp{
+    display: flex;
+    flex-direction: column;
+    border-radius: 15px;
+    width: 100%;
+    background: var(--card);
+}
+
+.wllt_balnc_cntTp{
+    display: flex;
+    align-items: center;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.wllt_balnc_amt{
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.wllt_balnc_BtnWrp{
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid rgba(225, 225, 225, 10%);
+}
+
+.wllt_balnc_Btn{
+    width: 50%;
+    border: none;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.wllt_balnc_BtnDep{
+    background: linear-gradient(to bottom right , #7F3BED 0% , #3114A6 100%);
+}
+
+.wllt_balnc_BtnWdr{
+    background: rgba(225, 225, 225, 10%);
+}
+
+.wllt_balnc_cnntWlltWrp{
+    border-radius: 10px;
+    background: rgba(225, 225, 225, 10%);
+}
+
+.wllt_balnc_cnntWlltWrp > h6 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.wllt_balnc_cnntBadge{
+    display: flex;
+    align-items: center;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 20%);
+    border: 1px solid rgba(0, 0, 0, 10%);
+    width: max-content;
+    color: var(--accentGreen);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.wallet_id_Wrp{
+    display: flex;
+    align-items: center;
+}
+
+.wallet_id{
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    background: rgba(0, 0, 0, 10%);
+    border: 1px solid rgba(0, 0, 0, 5%);
+    border-radius: 5px;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+    width: 100%;
+}
+
+.wallet_id_Icon{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 20%);
+    border: 1px solid rgba(0, 0, 0, 20%);
+    border-radius: 5px;
+}
+
+.wllt_winPec_Wrp{
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    /* justify-content: space-between; */
+}
+
+.wllt_winPec_Itm{
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border-radius: 15px;
+}
+
+.wllt_winPec_Itm > h6 {
+    display: flex;
+    align-items: center;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.wllt_winPec_Itm > h6 > span {
+    opacity: 50%;
+}
+
+.wllt_winPec_Itm > h4 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    margin-bottom: 0;
+    margin-top: 0;
+    text-align: center;
+}
+
+.wllt_sectNots_wrp{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    position: relative;
+    border-radius: 10px;
+    background: #07041A;
+}
+
+.wllt_sectNots_wrp > h6 {
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    color: var(--white);
+    margin-bottom: 0;
+}
+
+.wllt_sectNots_icon{
+    margin-left: auto;
+    color: var(--white);
+}
+
+.wllt_sectNots_icon > svg{
+    position: relative;
+    bottom: 2px;
+}
+
+.wllt_supp_wrp{
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(to bottom right , #131417  0% , #333C59 100%);
+    border-radius: 15px;
+}
+
+.wllt_supp_top{
+    display: flex;
+    align-items: center;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.wllt_supp_top > span {
+    opacity: 50%;
+}
+
+.wllt_supp_row{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.wllt_supp_col{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.wllt_supp_col > img{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.wllt_supp_col > h6 {
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    margin-bottom: 0;
+}

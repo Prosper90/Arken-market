@@ -1,0 +1,445 @@
+@import url('https://fonts.cdnfonts.com/css/satoshi');
+
+
+:root {
+    --satoshiFont : 'Satoshi', sans-serif;
+    --white : #fff;
+    --black : #000;
+    --secText : #A1A1A2;
+    --accentColor: #304AFF;
+    --navbar: #0B0C0F;
+    --accentGreen: #34C759;
+}
+
+
+.obrd_wrp_main{
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.rotating-spinner {
+  animation: spin 1s linear infinite;
+  display: inline-block; 
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+.onbord_subtbtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    background: linear-gradient(to bottom right , #7F3BED 0% ,#3114A6 100%);
+    width: 100%;
+    max-width: 500px;
+    border: none;
+    font-weight: 500;
+}
+
+.onbord_emptytbtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    background: transparent;
+    width: 100%;
+    max-width: 500px;
+    border: none;
+    font-weight: 500;
+}
+
+.obrd_back_wrp{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.obrd_back_wrp > span{
+    display: flex;
+    align-items: center;
+    color: var(--white);
+    font-weight: 500;
+    font-family: var(--satoshiFont);
+    gap: 3px;
+    cursor: pointer;
+}
+
+.obrd_back_wrp > h6{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 0;
+}
+
+.obrd_back_wrp > h6 > p {
+    font-weight: bold;
+    font-family: var(--satoshiFont);
+    background-image: linear-gradient(to bottom right, #7F3BED 0%, #3114A6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: #7F3BED;
+    margin-bottom: 0;
+}
+
+.obrd_back_wrp > h6 > span {
+    color: var(--white);
+    opacity: 50%;
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+}
+
+.obrd_middl_main{
+    display: flex;
+    width: 100%;
+}
+
+
+.obrd_middl_wrp {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.obrd_middl_ImgWrp{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.obrd_middl_ImgWrp > img {
+    margin-bottom: 10px;
+}
+
+.obrd_middl_ImgWrp > h5 {
+    margin-bottom: 3px;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    text-align: center;
+}
+
+.obrd_middl_ImgWrp > p {
+    margin-bottom: 0;
+    color: var(--secText);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    text-align: center;
+}
+
+.obrd_middl_cntrPara{
+    display: flex;
+    align-items: center;
+    margin-bottom: 0;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    text-align: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.obrd_middl_cntrPara > svg {
+    color: #34C759;
+}
+
+.obrd_wllet_wrp{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.obrd_wllet_itm{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 15px;
+    background: linear-gradient(to right , #131417 0% , #212636 100%);
+}
+
+.obrd_wllet_itmcnt{
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    position: relative;
+    width: 100%;
+}
+
+.obrd_wllet_itmcnt > h6 {
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+}
+
+.obrd_wllet_itmcnt > h6 > span {
+    background: rgba(1, 219, 27, 30%);
+    color: #01DB1B;
+    border-radius: 3px;
+}
+
+.obrd_wllet_itmcnt > p {
+    font-family: var(--satoshiFont);
+    color: var(--secText);
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.obrd_wllet_itmcnt > svg {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translate(0, -50%);
+    color: var(--accentColor);
+}
+
+.obrd_mdl_InptMain{
+    border-radius: 15px;
+    background: linear-gradient(to right , #131417 0% , #212636 100%);
+    display: flex;
+    flex-direction: column;
+}
+
+.obrd_mdl_InptWrp{
+    display: flex;
+    flex-direction: column;
+}
+
+.obrd_mdl_InptWrp > label {
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    font-weight: 500;
+}
+
+.obrd_mdl_Inpt {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    background: rgba(0, 0, 0, 50%);
+    border: 1px solid var(--secText);
+    border-radius: 10px;
+}
+.obrd_mdl_Inpt_select{
+    width: 100% !important;
+    background: transparent !important;
+}
+.css-13cymwt-control{
+    background: transparent !important;
+}
+.obrd_mdl_Inpt > span {
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    color: var(--white);
+}
+
+.obrd_mdl_Inpt > input{
+    border: none;
+    background: none;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: bold;
+    width: 100%;
+}
+
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.obrd_mdl_Inpt > input:focus{
+    outline: none;
+}
+
+.obrd_mdl_InpMin{
+    color: var(--secText);
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    margin-bottom: 0;
+}
+
+.obrd_mdl_amunWrp{
+    display: flex;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+}
+
+.obrd_mdl_amunItm{
+    display: flex;
+    align-items: center;
+    width: 50%;
+    color: var(--white);
+    font-family: var(--satoshiFont);
+    font-weight: 500;
+    justify-content: center;
+    background: var(--navbar);
+    border-radius: 5px;
+}
+
+.onbrd_dtlSw_wrp{
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.onbrd_dtlSw_itm{
+    display: flex;
+    align-items: center;
+    border-radius: 15px;
+    background: linear-gradient(to right , #131417 0% , #212636 100%);
+}
+
+.onbrd_dtlSw_cnt{
+    display: flex;
+    flex-direction: column;
+}
+
+.onbrd_dtlSw_cnt > label{
+    font-family: var(--satoshiFont);
+    color: var(--secText);
+    font-weight: 400;
+}
+
+.onbrd_dtlSw_cnt > h6{
+    font-family: var(--satoshiFont);
+    color: var(--white);
+    font-weight: bold;
+    margin-bottom: 0;
+}
+
+.onbrd_dtlSwAccnt_cnt > h6 {
+    color: var(--accentGreen);
+}
+
+.onbrd_dtl_btmcnt{
+    color: var(--white);
+    opacity: 50%;
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+    text-align: center;
+}
+
+.validate {
+  color: red;
+}
+
+.css-1nmdiq5-menu{
+    background-color: #212529 !important;
+}
+
+.css-13cymwt-control{
+    background-color: transparent !important;
+}
+
+.css-b62m3t-container{
+    background-color: transparent !important;
+}
+
+.css-13cymwt-control:hover {
+    background-color: transparent !important;
+}
+
+.css-1xc3v61-indicatorContainer :active{
+    background-color:transparent !important;
+}
+
+.css-13cymwt-control :active{
+    background-color:transparent !important;
+}
+
+.css-t3ipsp-control{
+        background-color:transparent !important;
+}
+
+.css-d7l1ni-option{
+    background-color: transparent !important;
+}
+
+.css-19bb58m{
+    color: #fff !important;
+}
+
+/* new css */
+
+.copy_number_Box,.copy_vrfyCde_Box,.mdlChosNtwk{
+    width: 85% !important;
+}
+.copy_number_WrnTxt{
+    color: #FFCC00;
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+}
+.copy_number_WrnTxt2{
+    color: #fff;
+    font-family: var(--satoshiFont);
+    font-weight: 400;
+}
+
+.copy_num_icon{
+    margin-left: 5px;
+}
+
+.copy_numb_inpt{
+    /* height: 95px; */
+}
+
+.copy_numb_inpt > svg {
+    fill: #fff;
+}
+
+.copy_vrfyCde_Box{
+    padding: 24px 16px 24px !important;
+}
+
+.mdlvrfyCdBtn{
+    margin: 0px !important;
+    margin-top: 15px !important;
+    padding: 8px 0px;
+}
+
+.mdlvrfyRsndCde {
+    color: #fff;
+}
+
+.mdlvrfyRsndCde > span {
+    color: #7636e4;
+}
+
+.obrd_middl_ImgWrpnewWllt{
+    margin-top: 15px;
+}
+
+.mdlChosNtwk_Lbl{
+    color: #fff;
+}
+
+.mdlChosNtwk{
+    height: auto !important;
+    min-height: auto !important;
+    max-height: auto !important;
+}
+
+.mdlChosNtwkSlect .css-hmnb8k-menu{
+    position: relative;
+}
+
+.qrcodeBox{
+    margin-top: 20px;
+    margin-bottom: 25px !important;
+    border: 1px solid #fff;
+}

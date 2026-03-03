@@ -1,0 +1,354 @@
+/* .depositand_withdrawpagemain{
+    padding-top: 24px;
+} */
+
+.tabs-container {
+  background-color: #000;
+  font-family: Satoshi;
+}
+
+
+.tabs-wrapper {
+  display: flex;
+  max-width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  /* margin-bottom: 32px; */
+  background-color: #1a1a1a;
+}
+
+.tab-button {
+  flex: 1;
+  /* padding: 12px; */
+  border: none;
+  /* font-size: 20px; */
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: transparent;
+  border-radius: 0;
+   font-family: Satoshi;
+  /* font-size: 14px; */
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: center;
+  color: #fff;
+}
+  
+.tab-button.active {
+   background-image: linear-gradient(104deg, #a721f4 0%, #1486a6 100%);
+  border-radius: 10px;
+}
+
+.tab-content {
+  /* margin-top: 32px; */
+  color: #fff;
+  max-width: 100%;
+}
+
+.content-title {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+.content-text {
+  color: #999;
+  line-height: 1.6;
+}
+
+.deposit-form-container {
+  background-color: #000;
+  color: #fff;
+}
+
+.form-field {
+  /* margin-bottom: 24px; */
+  position: relative;
+}
+
+.field-label {
+  display: block;
+     font-family: Satoshi;
+    /* font-size: 14px; */
+    font-weight: normal;
+    font-stretch: normal;
+    font-style: normal;
+    line-height: normal;
+    letter-spacing: normal;
+    text-align: left;
+    color: #a1a1a2;
+  /* margin-bottom: 12px; */
+}
+
+.currency-select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+  /* padding: 3.5px 18px 6.5px 12px; */
+    border-radius: 10px;
+    border: solid 0.5px #333;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.currency-select:hover {
+  border-color: #555;
+}
+
+.currency-content {
+  display: flex;
+  align-items: center;
+  /* gap: 12px; */
+}
+
+.currency-icon {
+  /* width: 24px; */
+  /* height: 24px; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sol-icon {
+  /* width: 20px; */
+  /* height: 20px; */
+  background: linear-gradient(135deg, #00FFA3 0%, #DC1FFF 50%, #00FFA3 100%);
+  border-radius: 50%;
+}
+
+.currency-text {
+  /* font-size: 16px; */
+  color: #fff;
+}
+
+.dropdown-arrow {
+  /* font-size: 24px; */
+  color: #fff;
+  transform: rotate(90deg);
+  transition: transform 0.3s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(-90deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  /* margin-top: 8px; */
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 1000;
+  display: none;
+}
+
+.dropdown-menu.show {
+  display: block;
+}
+
+.dropdown-item {
+  /* padding: 16px 20px; */
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  /* font-size: 16px; */
+  color: #fff;
+  border-bottom: 1px solid #333;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #2a2a2a;
+}
+
+.amount-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* padding: 14px 24px; */
+  background-color: transparent;
+  border: 1px solid #333;
+  border-radius: 12px;
+  /* gap: 16px; */
+}
+
+.amount-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  /* font-size: 32px; */
+  cursor: pointer;
+  /* padding: 0; */
+  width: 40px;
+  /* height: 40px; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
+}
+
+.amount-btn:hover {
+  opacity: 0.7;
+}
+
+.amount-display {
+  flex: 1;
+  text-align: center;
+}
+
+.amount-input {
+  /* font-size: 32px; */
+  font-weight: 400;
+  color: #fff;
+  /* margin-bottom: 4px; */
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  font-family: inherit;
+}
+
+.amount-input::placeholder {
+  color: #fff;
+}
+
+
+.address-input {
+  /* font-size: 32px; */
+  font-weight: 400;
+  color: #fff;
+  /* margin-bottom: 4px; */
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 100%;
+  font-family: inherit;
+}
+
+.address-input::placeholder {
+  color: #fff;
+}
+
+.amount-placeholder {
+  /* font-size: 13px; */
+  color: #6b7280;
+}
+
+.wallet-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* padding: 5px 12px; */
+  background-color: transparent;
+  border: 1px solid #333;
+  border-radius: 12px;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.wallet-address:hover {
+  border-color: #555;
+}
+
+.wallet-text {
+  /* font-size: 14px; */
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-arrow {
+  /* font-size: 24px; */
+  color: #fff;
+  margin-left: 12px;
+}
+
+
+.info-alert-wrapper {
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  /* font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; */
+  /* margin-bottom: 64px; */
+}
+.deponbord_subtbtn{
+     display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  /* gap: 10px; */
+  /* padding: 15px 10px; */
+  border-radius: 5px;
+  background-image: linear-gradient(98deg, #7f3bed 0%, #3114a6 100%);
+   font-family: Satoshi;
+  /* font-size: 14px; */
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  width: 100%;
+  border: none;
+}
+
+.info-alert {
+  display: flex;
+  align-items: center;
+  /* gap: 16px; */
+  max-width: 100%;
+  /* padding: 16px; */
+    border-radius: 10px;
+    background-color: #07041a;
+}
+
+.info-icon {
+    flex-shrink: 0;
+    /* width: 21px; */
+    /* height: 21px; */
+    background: linear-gradient(135deg, #0099ff 0%, #0077ff 100%);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-text {
+  color: #fff;
+  /* font-size: 16px; */
+  font-weight: 600;
+  font-style: italic;
+}
+
+.info-content {
+  flex: 1;
+}
+
+.info-text {
+   font-family: Satoshi;
+  /* font-size: 12px; */
+  font-weight: normal;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  opacity: 0.8;
+  margin: 0;
+}

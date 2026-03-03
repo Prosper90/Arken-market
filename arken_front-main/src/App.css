@@ -1,0 +1,320 @@
+*{
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+@font-face {
+  font-family: 'mbfFont'; 
+  src: url('./assets/font/mbfFont/MBF\ Canno\ Regular.otf') format('otf');
+  font-weight: normal;
+}
+
+
+body{
+    height: 100vh;
+    background: #000000;
+}
+
+.cmmn_bdy_mainwrp{
+    /* height: 100vh; */
+    background: #000000;
+    padding: 30px 20px 20px;
+    overflow: auto;
+}
+
+.error-text{
+color: #ff4d4f;
+font-size: 12px;
+margin-bottom: 8px;
+text-align: left;
+
+}
+
+
+.skl {
+  background: rgba(255, 255, 255, 30%);
+  background-size: 400% 100%;
+  animation: skl-shimmer 1.4s ease infinite;
+  border-radius: 6px;
+}
+
+@keyframes skl-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.skl-text-sm { height: 12px; width: 90px; }
+.skl-text-md { height: 14px; width: 120px; }
+.skl-text-lg { height: 18px; width: 160px; }
+
+.skl-number-sm { height: 18px; width: 70px; }
+.skl-number-md { height: 22px; width: 100px; }
+.skl-number-lg { height: 26px; width: 140px; }
+
+.skl-full { width: 100%; }
+.skl-rounded { border-radius: 999px; }
+
+
+.skeleton-badge { width: 60px; height: 18px; }
+.skeleton-image { width: 40px; height: 40px; border-radius: 50%; }
+.skeleton-title { width: 70%; height: 16px; margin-left: 10px; }
+.skeleton-text { width: 80px; height: 14px; }
+.skeleton-circle { width: 50px; height: 50px; border-radius: 50%; }
+.skeleton-button { width: 100%; height: 36px; margin-top: 10px; }
+
+@keyframes skeleton-loading {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.bot_modal_box {
+  overflow-y: scroll;
+  border: none;
+  height: max-content !important;
+  min-height: max-content !important;
+  outline: none;
+  box-shadow: none;
+  /* padding: 16px 16px 24px; */
+  border-radius: 15px;
+  background-color: #131417;
+}
+
+.bot_modal_body .css-1gsv261 {
+  border-bottom: solid 1px #dfe4ea;
+  background-color: #dfe4ea;
+}
+.bot_modal_body .css-1usuzwp-MuiButtonBase-root-MuiTab-root.Mui-selected {
+  font-size: 13px;
+  font-weight: normal;
+  font-stretch: normal;
+  font-style: normal;
+  text-align: center;
+  color: #0363ff !important;
+}
+.sell_modal_bodynew .css-1usuzwp-MuiButtonBase-root-MuiTab-root.Mui-selected {
+  color: #df514c !important;
+}
+.bot_modal_body .css-1qltlow-MuiTabs-indicator {
+  height: 3px !important;
+  border-radius: 10px;
+}
+.bot_modal_body .css-1usuzwp-MuiButtonBase-root-MuiTab-root {
+  font-size: 13px !important;
+  font-weight: normal !important;
+  font-stretch: normal !important;
+  font-style: normal !important;
+  line-height: normal !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  text-align: center !important;
+  color: #4f5c6c !important;
+}
+.bot_modal_body .css-1qltlow-MuiTabs-indicator {
+  color: #0363ff;
+}
+.sell_modal_bodynew .css-1qltlow-MuiTabs-indicator {
+  color: #df514c !important;
+}
+.bot_modal_body .css-19kzrtu {
+  padding: 0px !important;
+}
+.bot_modal_body .css-1xp5r68-MuiFormControl-root-MuiTextField-root {
+  width: 100%;
+}
+.close_icon{
+  color: #fff;
+  display: flex;
+  justify-content: end;
+  align-items: center;
+}
+
+.place_my_bethead{
+   font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  color: #fff;
+}
+
+.bitcoin_headtag{
+   font-family: Satoshi;
+  font-weight: bold;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: center;
+  color: #fff;
+}
+.playmy_betheadtag{
+  display: flex;
+  gap: 8px;
+}
+.odds_detailstag{
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 12px;
+  border-radius: 5px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.yourchoice_change{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.yourchoice_changehead{
+  opacity: 0.5;
+  font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;margin-bottom: 0;
+}
+.yourchoice_changeyesspan{
+   display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  border-radius: 100px;
+  background-color: #34c759;
+}
+.yourchoice_changeyespara{
+   font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  margin-bottom: 0;
+}
+.odds_valuetext{
+  font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  margin-bottom: 0;
+}
+.input_labelstag{
+  display: flex;
+  flex-direction: column;
+}
+.input_labelstag_lable{
+    opacity: 0.5;
+  font-family: Satoshi;
+  font-size: 14px;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+}
+
+.bet_amount_cls{
+   display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  opacity: 0.8;
+  border-radius: 5px;
+  border: solid 0.5px #a1a1a2;
+  background-color: rgba(0, 0, 0, 0.5);
+   opacity: 0.8;
+  font-family: Satoshi;
+  font-size: 14px;
+  font-weight: normal;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  width: 100%;
+}
+.bet_amount_cls:focus{
+  outline: none;
+}
+.input_labelstaginput{
+  display: flex;
+  flex-direction: column;
+}
+.doted_linecircletag{
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  border-radius: 5px;
+  border: dotted 2px #a1a1a2;
+}
+.confirm_betbtn{
+   display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  border-radius: 5px;
+  background-image: linear-gradient(98deg, #7f3bed 0%, #3114a6 100%);
+    font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+}
+.potencial_win_per{
+  opacity: 0.5;
+  font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  margin-bottom: 0;
+}
+.potencial_win_value{
+   font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #34c759;
+  margin-bottom: 0;
+}
+.profit_value{
+    font-family: Satoshi;
+  font-weight: 500;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: normal;
+  letter-spacing: normal;
+  text-align: left;
+  color: #fff;
+  margin-bottom: 0;
+}
+@media (max-width: 575px) {
+  .bot_modal_box {
+    width: 90%;
+  }
+}

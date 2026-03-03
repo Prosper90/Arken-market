@@ -1,0 +1,385 @@
+@import url("https://fonts.cdnfonts.com/css/satoshi");
+@import url("https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,100..900;1,100..900&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
+@font-face {
+  font-family: "mbfFont";
+  src: url("../../assets/font/mbfFont/MBFCannoRegular.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+:root {
+  --satoshiFont: "Satoshi", sans-serif;
+  --interFont: "Inter", sans-serif;
+  --white: #fff;
+  --black: #000000;
+  --secText: #a1a1a2;
+  --accentColor: #304aff;
+  --navbar: #0b0c0f;
+  --accentGreen: #34c759;
+  --accentRed: #ff383c;
+  --card: #131417;
+}
+
+.prfl_top_cntWrp {
+  display: flex;
+  align-items: start;
+  border-radius: 20px;
+  /* background: linear-gradient(to bottom right , #7F3BED 0% , #3114A6 100%); */
+  background: url("../../assets/image/prfl_backImg.webp");
+  background-size: cover;
+  /* background-repeat: round; */
+}
+
+.prfl_top_cnt {
+  display: flex;
+  flex-direction: column;
+}
+
+.prfl_top_cnt > h5 {
+  color: var(--white);
+  font-family: var(--interFont);
+  font-weight: 500;
+  margin-bottom: 0;
+}
+.prfl_top_cntPara {
+  color: #fff;
+}
+.prfl_top_cnt > p {
+  color: var(--white);
+  font-family: var(--interFont);
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.prfl_top_cntWrp > span {
+  margin-left: auto;
+}
+
+.prfl_grop_cntWrp {
+  display: flex;
+  flex-direction: column;
+  border-radius: 15px;
+  background: var(--card);
+}
+
+.prfl_grop_cnt {
+  display: flex;
+  align-items: center;
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: bold;
+  margin-bottom: 0;
+}
+
+.prfl_grop_row {
+  display: flex;
+  flex-direction: column;
+}
+
+.prfl_grop_col {
+  display: flex;
+  align-items: center;
+  border-radius: 10px;
+  background: rgba(225, 225, 225, 10%);
+}
+
+.prfl_grop_col > h6 {
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: bold;
+  margin-bottom: 0;
+}
+
+.group_teamIcon {
+  margin-left: auto;
+  color: #304aff;
+}
+
+.prfl_betHst_wrp {
+  display: flex;
+  flex-direction: column;
+  border-radius: 15px;
+  background: var(--card);
+}
+
+.prfl_Hst_topWrp {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(225, 225, 225, 10%);
+}
+
+.prfl_Hst_topWrp > span {
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: bold;
+  margin-bottom: 0;
+}
+
+.profl_tab_main {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.profl_tab_wrp {
+  display: flex;
+  align-items: center;
+  border-radius: 100px;
+  background: rgba(225, 225, 225, 10%);
+  margin-bottom: 0 !important;
+}
+
+.profl_tab_wrp > li {
+  flex: 1;
+}
+
+.profl_tab_wrp > li > button {
+  width: 100%;
+  border-radius: 100px;
+  background: transparent;
+  border: none;
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: 500;
+  margin-bottom: 0;
+  font-size: 11px;
+  padding: 6px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profl_tab_wrp > li > .active.profl_tab_btn {
+  background: linear-gradient(to bottom right, #131417 0%, #333c59 100%);
+  border: 1px solid rgba(225, 225, 225, 20%);
+  color: #fff;
+}
+
+.profl_tab_content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.profl_tab_contpane {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.profl_tab_content {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.profl_tab_row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.profl_tab_itm {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  background: rgba(225, 225, 225, 10%);
+}
+
+.prfl_tab_itmHead {
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: 500;
+  margin-bottom: 0;
+}
+.image_para_profile {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+}
+
+.prfl_tab_itmBdgWrp {
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.prfl_tab_itmBdg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  font-family: var(--satoshiFont);
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.prfl_tab_itmBdg.pendg_Bdg {
+  background: rgba(255, 141, 40, 30%);
+  color: #ff8d28;
+}
+
+.prfl_tab_itmBdg.pendg_No {
+  background: #34c75930;
+  color: #34c759;
+}
+
+.prfl_tab_itmexit {
+  border-radius: 5px;
+}
+.prfl_tab_itmexit.pendg_No {
+  background: #c14a4d !important;
+  color: #fff !important;
+}
+.prfl_tab_itmexit.pendg_Bdg {
+  background: #c14a4d !important;
+  color: #fff !important;
+}
+
+.prfl_tab_itmBdg.pendg_Yes {
+  background: #34c75930;
+  color: #34c759;
+}
+
+.prfl_tab_CountWrp {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: auto;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(225, 225, 225, 10%);
+}
+
+.skeleton {
+  pointer-events: none;
+}
+
+/* Base skeleton line */
+.skeleton-line,
+.skeleton-pill {
+  background: rgba(255, 255, 255, 30%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* shimmer */
+.skeleton-line::after,
+.skeleton-pill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.6),
+    transparent
+  );
+  animation: shimmer 1.2s infinite;
+}
+
+/* Text sizes */
+.skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+}
+
+/* Pills (badges) */
+.skeleton-pill {
+  width: 60px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+/* Width helpers */
+.w-30 {
+  width: 30%;
+}
+.w-40 {
+  width: 40%;
+}
+.w-45 {
+  width: 45%;
+}
+.w-50 {
+  width: 50%;
+}
+.w-60 {
+  width: 60%;
+}
+.w-70 {
+  width: 70%;
+}
+.w-80 {
+  width: 80%;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.prfl_tab_Countitm {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.prfl_tab_CountHed {
+  display: flex;
+  align-items: center;
+  color: var(--secText);
+  font-family: var(--satoshiFont);
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.poten_win {
+  color: var(--accentGreen) !important;
+}
+
+.prfl_tab_CountPara {
+  color: var(--white);
+  font-family: var(--satoshiFont);
+  font-weight: 500;
+  margin-bottom: 0;
+}
+
+.prfl_tab_plcedOn {
+  color: var(--secText);
+  font-family: var(--satoshiFont);
+  font-weight: 400;
+  margin-bottom: 0;
+}
+
+.cmmn_tbl_noData {
+  color: var(--white);
+  text-align: center;
+}
+
+.prfl_tab_WinngAmnt {
+  color: var(--accentGreen);
+  font-family: var(--satoshiFont);
+  font-weight: 500;
+  margin-bottom: 0;
+  width: 100%;
+  display: block;
+  text-align: center;
+}
+
+.prfl_histrytab_CountWrp {
+  flex-wrap: wrap;
+}
+
+.prfl_tab_itmexit {
+  display: flex;
+  gap: 7px;
+}
