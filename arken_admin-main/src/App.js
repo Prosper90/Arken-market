@@ -73,7 +73,7 @@ function App() {
 
   return (
     <>
-      <BrowserRouter basename="/arken_admin">
+      <BrowserRouter basename="/">
         <ToastContainer />
         <Routes>
           <Route path="/" element={<Landing />} />
