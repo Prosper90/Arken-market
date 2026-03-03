@@ -1,4 +1,5 @@
-FROM node:18
+# Stage 1: Build
+FROM node:18 AS builder
 
 WORKDIR /usr/src/app
 
@@ -8,8 +9,14 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+RUN npm run build
+
+# Stage 2: Serve with nginx
+FROM nginx:alpine
+
+COPY --from=builder /usr/src/app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 3001
 
-ENV PORT=3001
-
-CMD ["npm", "start"]
+CMD ["nginx", "-g", "daemon off;"]
