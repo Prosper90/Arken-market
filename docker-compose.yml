@@ -1,0 +1,108 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: always
+    networks:
+      - appnet
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_ERLANG_COOKIE: arken_secret_cookie
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - appnet
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+
+  auth-service:
+    build: ./arken_backend-main
+    container_name: auth-service
+    restart: always
+    ports:
+      - "4000:4000"
+    env_file: ./arken_backend-main/.env
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      PORT: 4000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - appnet
+
+  bot-service:
+    build: ./arken_service_consumer-1-main
+    container_name: bot-service
+    restart: always
+    env_file: ./arken_service_consumer-1-main/.env
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      REDIS_HOST: redis
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - appnet
+
+  market-service:
+    build: ./arken_service_consumer-2-main
+    container_name: market-service
+    restart: always
+    ports:
+      - "3003:3003"
+    env_file: ./arken_service_consumer-2-main/.env
+    environment:
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      REDIS_HOST: redis
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - appnet
+
+  mini-app:
+    build: ./arken_front-main
+    container_name: mini-app
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file: ./arken_front-main/.env
+    environment:
+      API_PROXY_TARGET: http://auth-service:4000
+      SOCKET_PROXY_TARGET: http://market-service:3003
+    networks:
+      - appnet
+
+  admin-panel:
+    build: ./arken_admin-main
+    container_name: admin-panel
+    restart: always
+    ports:
+      - "3001:3001"
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  rabbitmq_data:

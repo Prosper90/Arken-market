@@ -1,0 +1,62 @@
+/* code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+} */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --ff-primary: "Plus Jakarta Sans", sans-serif !important;
+
+  --primary-clr: #7F3BED;
+  --clr-accent-400: #121418;
+  --border-primary: #3a3e46;
+
+  --fw-regular: 300;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+}
+
+.gr-clr {
+  color: var(--primary-clr);
+}
+
+body {
+  margin: 0;
+  font-family: "Plus Jakarta Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a:hover {
+  color: var(--primary-clr);
+}
+
+h1,
+h1,
+h3,
+h4,
+h5,
+h6,
+p,
+span,
+label,
+a,
+button,
+div {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+.side_bar_newIcn{
+    font-size: 22px;
+    color: #ffff;
+}
+
+.navlink_new.active .side_bar_newIcn{
+  color: #7F3BED;
+}
