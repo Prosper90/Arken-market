@@ -80,3 +80,10 @@ PROGRESS.md
 STARTUP_GUIDE.md
 TESTING_GUIDE.md
 UMA_GUIDE.md
+ADMIN_BUILD_GUIDE.md
+
+# ── Env files without leading dot ─────────────────────────────────────────────
+env.production
+env.local
+env.development
+env.staging

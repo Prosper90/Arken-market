@@ -92,7 +92,11 @@ services:
       - appnet
 
   admin-panel:
-    build: ./arken_admin-main
+    build:
+      context: ./arken_admin-main
+      args:
+        REACT_APP_APISERVICE_MAIN: https://arken.market/
+        REACT_APP_siteUrl: https://arken.market
     container_name: admin-panel
     restart: always
     ports:

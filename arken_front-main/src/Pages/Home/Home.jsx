@@ -494,7 +494,7 @@ useEffect(() => {
   const handleJoinPrivateMarket = async () => {
     const code = joinCode.trim().toUpperCase();
     if (!code) { toast.error('Enter an invite code'); return; }
-    const tid = telegramUser?.id;
+    const tid = telegramUser?.telegramId;
     if (!tid) { toast.error('Telegram ID not found'); return; }
     setJoinLoading(true);
     try {
