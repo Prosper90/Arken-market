@@ -7,12 +7,7 @@ import apiService from "../../core/service/detail";
 import ReactPaginate from "react-paginate";
 import Moment from "moment";
 import FromDatePicker from "../fromdatepicker";
-import Box from "@mui/material/Box";
 import Select from "react-select";
-
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 import ToDatePicker from "../todatepicker";
 import { FaFilter } from "react-icons/fa6";
 import { toast } from "react-toastify";
@@ -67,13 +62,6 @@ const customStyles = {
   }),
 };
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 const Resolution = () => {
 
@@ -491,22 +479,10 @@ const handleClose = () => {
 </div>
 
 
-<Modal
-  aria-labelledby="transition-modal-title"
-  aria-describedby="transition-modal-description"
-  open={open}
-  onClose={handleClose}
-  closeAfterTransition
-  slots={{ backdrop: Backdrop }}
-  slotProps={{
-    backdrop: {
-      timeout: 500,
-    },
-  }}
->
-  <Fade in={open}>
-    <Box sx={style} className="popup_modal-delete">
-      
+{open && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="popup_modal-delete">
+
       <div className="popup_modal-title">
         <span>
           <span className="popup_modal-title-icon"></span>
@@ -651,20 +627,14 @@ const handleClose = () => {
         </button>
       </div>
 
-    </Box>
-  </Fade>
-</Modal>
+    </div>
+  </div>
+)}
 
 
-<Modal
-  open={editOpen}
-  onClose={() => setEditOpen(false)}
-  closeAfterTransition
-  slots={{ backdrop: Backdrop }}
-  slotProps={{ backdrop: { timeout: 500 } }}
->
-  <Fade in={editOpen}>
-    <Box sx={style} className="popup_modal-delete">
+{editOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="popup_modal-delete">
 
       <div className="popup_modal-title">
         <span>Edit Claim</span>
@@ -776,9 +746,9 @@ const handleClose = () => {
 
       </div>
 
-    </Box>
-  </Fade>
-</Modal>
+    </div>
+  </div>
+)}
 
                                 </div>
                             </div>

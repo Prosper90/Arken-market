@@ -11,29 +11,15 @@ import { FaFilter } from "react-icons/fa6";
 // import Modal from "@mui/joy/Modal";
 import Moment from "moment";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import ModalClose from "@mui/joy/ModalClose";
 import SkeletonwholeProject from "../pages/SkeletonwholeProject";
-import Sheet from "@mui/joy/Sheet";
-import Typography from "@mui/material/Typography";
 import { toast } from "react-toastify";
 import { Bars } from "react-loader-spinner";
 import CsvDownloader from "react-csv-downloader";
 
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 import { ScaleLoader } from "react-spinners";
-import { Skeleton } from "@mui/material";
+
 import FromDatePicker from "./fromdatepicker";
 import ToDatePicker from "./todatepicker";
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 function Dashboard() {
   const rows = Array.from({ length: 5 }); // 4 rows
@@ -453,14 +439,9 @@ function Dashboard() {
                                   {Array.from({ length: cols }).map(
                                     (_, colIndex) => (
                                       <td key={colIndex}>
-                                        <Skeleton
-                                          variant="rounded"
-                                          height={22}
-                                          sx={{
-                                            bgcolor: "#b8b8b833",
-                                            borderRadius: "6px",
-                                          }}
-                                        />
+                                        <div
+                                          className="w-full h-[22px] bg-[#b8b8b833] rounded-[6px] animate-pulse"
+                                        ></div>
                                       </td>
                                     )
                                   )}
@@ -527,90 +508,6 @@ function Dashboard() {
                                       </td>
                                       
 
-                                      <Modal
-                                        aria-labelledby="transition-modal-title"
-                                        aria-describedby="transition-modal-description"
-                                        open={open}
-                                        onClose={handleClose}
-                                        closeAfterTransition
-                                        slots={{ backdrop: Backdrop }}
-                                        slotProps={{
-                                          backdrop: {
-                                            timeout: 500,
-                                          },
-                                        }}
-                                      >
-                                        <Fade in={open}>
-                                          <Box
-                                            sx={style}
-                                            className="popup_modal-delete"
-                                          >
-                                            <div className="popup_modal-title">
-                                              <span>
-                                                <span className="popup_modal-title-icon">
-                                                  {/* <i className="fa-solid fa-triangle-exclamation"></i> */}
-                                                </span>
-                                                Disable User
-                                              </span>
-                                            </div>
-                                            <div className="popup_modal-content">
-                                              <div className="form-group row">
-                                                <label className="col-lg-12 col-form-label form-control-label">
-                                                  Disable Reason
-                                                </label>
-                                                <div className="col-lg-12">
-                                                  <textarea
-                                                    type="text"
-                                                    name="reason"
-                                                    maxLength={250}
-                                                    value={formData.reason}
-                                                    onChange={
-                                                      handledisableChange
-                                                    }
-                                                    placeholder="Enter Disable reason"
-                                                    className="form-control"
-                                                    required
-                                                  />
-                                                  <div className="help-block">
-                                                    {Err == true ? (
-                                                      <div className="text-red dep-error-text">
-                                                        {Errmessage}
-                                                      </div>
-                                                    ) : (
-                                                      ""
-                                                    )}
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </div>
-                                            <div className="popup_modal-btn-wrap">
-                                              <button
-                                                className="popup_modal-btn-cancel"
-                                                onClick={() => handleClose()}
-                                              >
-                                                Cancel
-                                              </button>
-                                              {buttonLoaderReject == true ? (
-                                                <button className="popup_modal-btn-confirm">
-                                                  Loading...
-                                                </button>
-                                              ) : (
-                                                <button
-                                                  className="popup_modal-btn-confirm"
-                                                  onClick={() => {
-                                                    handleStatusChange(
-                                                      userIdref.current,
-                                                      userStatusref.current
-                                                    );
-                                                  }}
-                                                >
-                                                  Disable User
-                                                </button>
-                                              )}
-                                            </div>
-                                          </Box>
-                                        </Fade>
-                                      </Modal>
                                     </tr>
                                   ))
                                 ) : (
@@ -1170,36 +1067,78 @@ function Dashboard() {
           </div>
         </div>
 
-        <Modal
-          aria-labelledby="modal-title"
-          aria-describedby="modal-desc"
-          open={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Sheet
-            variant="outlined"
-            sx={{
-              minWidth: 500,
-              borderRadius: "md",
-              p: 3,
-              boxShadow: "lg",
-            }}
-          >
-            <ModalClose variant="plain" sx={{ m: 1 }} />
-            <Typography
-              component="h2"
-              id="modal-title"
-              level="h4"
-              textColor="inherit"
-              fontWeight="lg"
-              mb={1}
-            ></Typography>
-            <Typography id="modal-desc">
+        {open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="popup_modal-delete">
+              <div className="popup_modal-title">
+                <span>
+                  <span className="popup_modal-title-icon">
+                    {/* <i className="fa-solid fa-triangle-exclamation"></i> */}
+                  </span>
+                  Disable User
+                </span>
+              </div>
+              <div className="popup_modal-content">
+                <div className="form-group row">
+                  <label className="col-lg-12 col-form-label form-control-label">
+                    Disable Reason
+                  </label>
+                  <div className="col-lg-12">
+                    <textarea
+                      type="text"
+                      name="reason"
+                      maxLength={250}
+                      value={formData.reason}
+                      onChange={handledisableChange}
+                      placeholder="Enter Disable reason"
+                      className="form-control"
+                      required
+                    />
+                    <div className="help-block">
+                      {Err == true ? (
+                        <div className="text-red dep-error-text">
+                          {Errmessage}
+                        </div>
+                      ) : (
+                        ""
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="popup_modal-btn-wrap">
+                <button
+                  className="popup_modal-btn-cancel"
+                  onClick={() => handleClose()}
+                >
+                  Cancel
+                </button>
+                {buttonLoaderReject == true ? (
+                  <button className="popup_modal-btn-confirm">
+                    Loading...
+                  </button>
+                ) : (
+                  <button
+                    className="popup_modal-btn-confirm"
+                    onClick={() => {
+                      handleStatusChange(
+                        userIdref.current,
+                        userStatusref.current
+                      );
+                    }}
+                  >
+                    Disable User
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="popup_modal-delete">
+              <button onClick={() => setIsModalOpen(false)} className="absolute top-3 right-3 text-gray-400 hover:text-white"><i className="fa-solid fa-xmark"></i></button>
               <h3 className="connect_a_connect_text">KYC Reject Details</h3>
               <div className="ycho_inner mt-4">
                 <input
@@ -1231,9 +1170,9 @@ function Dashboard() {
                   )}
                 </div>
               </div>
-            </Typography>
-          </Sheet>
-        </Modal>
+            </div>
+          </div>
+        )}
       </div>
       {/* )} */}
     </div>

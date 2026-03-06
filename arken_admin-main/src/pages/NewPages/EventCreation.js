@@ -11,10 +11,6 @@ import { FaFilter } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import { MdAddCircle } from "react-icons/md";
 
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -24,14 +20,6 @@ import apiService from "../../core/service/detail";
 import { FaRegCalendarAlt } from "react-icons/fa";
 import axios from "axios";
 import { env } from "../../core/service/envconfig";
-import { Typography } from "@mui/material";
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 const EventCreaction = () => {
   const [userdata, setuserdata, userdataref] = useState("");
@@ -48,7 +36,7 @@ const EventCreaction = () => {
   const [formStep, setFormStep] = useState(1);
 
 
- 
+
   const handleFormStep = (step) => {
     if (formStep < 5) {
       setFormStep(step);
@@ -512,7 +500,7 @@ const EventCreaction = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            
+
                             <>
                               {marketData.length > 0 ? (
                                 marketData.map((item, i) => (
@@ -617,21 +605,9 @@ const EventCreaction = () => {
         </div>
       </div>
 
-    { open &&  <Modal
-        aria-labelledby="transition-modal-title"
-        aria-describedby="transition-modal-description"
-        open={open}
-        onClose={handleClose}
-        closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            timeout: 500,
-          },
-        }}
-      >
-        <Fade in={open}>
-          <Box sx={style} className="popup_modal-eventCrtn">
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-eventCrtn">
             <div className={`evnt_crct_popInsd `}>
               <span
                 className="modal_close_icon"
@@ -828,28 +804,13 @@ const EventCreaction = () => {
                 </div>
               ) : null}
             </div>
-          </Box>
-        </Fade>
-      </Modal>}
+          </div>
+        </div>
+      )}
 
-     { edit && <Modal
-        aria-labelledby="transition-modal-title"
-        aria-describedby="transition-modal-description"
-        open={edit}
-        onClose={() => {
-          handleReset();
-          setEdit(false);
-        }}
-        closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            timeout: 500,
-          },
-        }}
-      >
-        <Fade in={edit}>
-          <Box sx={style} className="popup_modal-eventCrtn">
+      {edit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-eventCrtn">
             <div className={`evnt_crct_popInsd `}>
               <span
                 className="modal_close_icon"
@@ -1048,47 +1009,39 @@ const EventCreaction = () => {
                 </div>
               ) : null}
             </div>
-          </Box>
-        </Fade>
-      </Modal>}
+          </div>
+        </div>
+      )}
 
-      <Modal
-        open={deleteModal.modal}
-        onClose={() => setDeleteModal({ id: "", modal: false })}
-        aria-labelledby="transition-modal-title"
-        aria-describedby="transition-modal-description"
-        closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            timeout: 500,
-          },
-        }}
-      >
-        <Box sx={style} className="popup_modal-delEvntCrtn">
-          <Typography id="modal-modal-title" variant="h6" component="h2">
-            Are You sure you want to delete ?
-          </Typography>
-          <p className="text-center">
-            This will delete all the associated data with this event
-          </p>
+      {deleteModal.modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-delete">
+            <div className="popup_modal-delEvntCrtn">
+              <p id="modal-modal-title">
+                Are You sure you want to delete ?
+              </p>
+              <p className="text-center">
+                This will delete all the associated data with this event
+              </p>
 
-          <Box className="popup_modal-delEvntCrtn-btnWrp">
-            <button
-              className="evnt_crct_popBackBtn"
-              onClick={() => setDeleteModal({ id: "", modal: false })}
-            >
-              Cancel
-            </button>
-            <button
-              className="evnt_crct_popNextBtn"
-              onClick={() => handleDelete(deleteModal.id)}
-            >
-              Delete
-            </button>
-          </Box>
-        </Box>
-      </Modal>
+              <div className="popup_modal-delEvntCrtn-btnWrp">
+                <button
+                  className="evnt_crct_popBackBtn"
+                  onClick={() => setDeleteModal({ id: "", modal: false })}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="evnt_crct_popNextBtn"
+                  onClick={() => handleDelete(deleteModal.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { Skeleton } from "@mui/material";
+
 
 const SkeletonDashboard = () => {
   const rows = Array.from({ length: 4 }); // 4 rows
@@ -11,48 +11,48 @@ const SkeletonDashboard = () => {
 
           <div className="skeleton_sidebar_links">
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
             <div className="skl_sidebar_flx">
-              <Skeleton variant="circular" className="skl_icon" />
-              <Skeleton variant="text" width="100%" className="skl_links" />
+              <div className="rounded-full bg-[#b8b8b833] animate-pulse skl_icon"></div>
+              <div className="bg-[#b8b8b833] animate-pulse w-full skl_links"></div>
             </div>
           </div>
         </div>

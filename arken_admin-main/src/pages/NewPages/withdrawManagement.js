@@ -10,7 +10,7 @@ import { toast } from "react-toastify";
 import SkeletonwholeProject from "../pages/SkeletonwholeProject";
 import { ScaleLoader } from "react-spinners";
 import CsvDownloader from "react-csv-downloader";
-import { Skeleton } from "@mui/material";
+
 
 import FromDatePicker from "./fromdatepicker";
 import ToDatePicker from "./todatepicker";
@@ -227,14 +227,9 @@ function Dashboard() {
                                 {Array.from({ length: cols }).map(
                                   (_, colIndex) => (
                                     <td key={colIndex}>
-                                      <Skeleton
-                                        variant="rounded"
-                                        height={22}
-                                        sx={{
-                                          bgcolor: "#b8b8b833",
-                                          borderRadius: "6px",
-                                        }}
-                                      />
+                                      <div
+                                        className="w-full h-[22px] bg-[#b8b8b833] rounded-[6px] animate-pulse"
+                                      ></div>
                                     </td>
                                   )
                                 )}

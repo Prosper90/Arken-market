@@ -1,126 +1,32 @@
-import { Skeleton } from "@mui/material";
+import React from "react";
 
-const SkeletonWhole = () => {
-  const rows = Array.from({ length: 4 }); // 4 rows
-  const cols = 6;
+const SkeletonwholeProject = () => {
   return (
-    <>
-      <div className="skeleton_wrap">
-        {/* <div className="skeleton_sidebar"></div> */}
-        <div className="skeleton_right w-100">
-          <div className="skeleton_right_top">
-            <Skeleton variant="circular" className="skl_dsh_user_icon" />
-          </div>
-
-          <div className="skeleton_right_body">
-            <Skeleton variant="text" className="skl_dsh_title" />
-
-            <div className="skeleton_rgt_box_wrap">
-              <Skeleton variant="text" className="skl_dsh_box" />
-              <Skeleton variant="text" className="skl_dsh_box" />
-              <Skeleton variant="text" className="skl_dsh_box" />
+    <div className="container-fluid animate-pulse">
+      <div className="row">
+        <div className="col-xl-2 col-lg-3 d-none d-lg-block px-0">
+          <div className="h-screen bg-white/5" />
+        </div>
+        <div className="col-xl-10 col-lg-9 col-12 px-0">
+          <div className="h-14 bg-white/5 mb-4" />
+          <div className="px-4 py-6">
+            <div className="h-8 w-48 rounded bg-white/10 mb-6" />
+            <div className="flex gap-3 mb-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-10 w-32 rounded bg-white/10" />
+              ))}
             </div>
-            <div className="skeleton_rgt_box_wrap skl_box_wrap_two">
-              <Skeleton variant="text" className="skl_dsh_box" />
-              <Skeleton variant="text" className="skl_dsh_box" />
-              <Skeleton variant="text" className="skl_dsh_box" />
-            </div>
-
-            <Skeleton variant="text" className="skl_dsh_title_two" />
-
-            <div className="skl_tble_outer">
-              <div className="table-responsive trans-table skl_tble">
-                <table className="w_100">
-                  <thead className="trans-head">
-                    <tr>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                      <th>
-                        <Skeleton
-                          variant="rounded"
-                          height={22}
-                          sx={{
-                            bgcolor: "#b8b8b833",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((_, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {Array.from({ length: cols }).map((_, colIndex) => (
-                          <td key={colIndex}>
-                            <Skeleton
-                              variant="rounded"
-                              height={22}
-                              sx={{
-                                bgcolor: "#b8b8b833",
-                                borderRadius: "6px",
-                              }}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            <div className="rounded-lg overflow-hidden">
+              <div className="h-10 bg-white/10 mb-1" />
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-12 bg-white/5 mb-1 rounded" />
+              ))}
             </div>
           </div>
-        </div>{" "}
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 
-export default SkeletonWhole;
+export default SkeletonwholeProject;

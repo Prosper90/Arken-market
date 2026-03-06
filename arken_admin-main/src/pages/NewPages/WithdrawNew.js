@@ -14,7 +14,6 @@ import CsvDownloader from "react-csv-downloader";
 import { MdAddCircle } from "react-icons/md";
 import apiService from "../../core/service/detail";
 import { postMethod } from "../../core/service/common.api";
-import { Skeleton } from "@mui/joy";
 
 const WithdrawNew = () => {
   useEffect(() => {
@@ -263,14 +262,7 @@ setCsvData(csvData);
                                 {Array.from({ length: cols }).map(
                                   (_, colIndex) => (
                                     <td key={colIndex}>
-                                      <Skeleton
-                                        variant="rounded"
-                                        height={22}
-                                        sx={{
-                                          bgcolor: "#b8b8b833",
-                                          borderRadius: "6px",
-                                        }}
-                                      />
+                                      <div className="h-5 rounded bg-white/10 animate-pulse" />
                                     </td>
                                   )
                                 )}

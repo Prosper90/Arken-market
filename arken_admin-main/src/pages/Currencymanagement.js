@@ -12,22 +12,10 @@ import ReactPaginate from "react-paginate";
 import { env } from "../core/service/envconfig";
 import ModalClose from "@mui/joy/ModalClose";
 import Sheet from "@mui/joy/Sheet";
-import Typography from "@mui/material/Typography";
-// import Modal from "@mui/joy/Modal";
-import { ScaleLoader } from "react-spinners";
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
+
 import { Skeleton } from "@mui/material";
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
+
 
 function Dashboard() {
   const inputRef = useRef(null);
@@ -1116,24 +1104,9 @@ function Dashboard() {
                                         </span>
                                       </td> */}
 
-                                      <Modal
-                                        aria-labelledby="transition-modal-title"
-                                        aria-describedby="transition-modal-description"
-                                        open={open}
-                                        onClose={handleClose}
-                                        closeAfterTransition
-                                        slots={{ backdrop: Backdrop }}
-                                        slotProps={{
-                                          backdrop: {
-                                            timeout: 500,
-                                          },
-                                        }}
-                                      >
-                                        <Fade in={open}>
-                                          <Box
-                                            sx={style}
-                                            className="popup_modal-delete"
-                                          >
+                                      {open && (
+                                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                                          <div className="relative w-full max-w-md p-4 bg-white border-2 border-gray-900 rounded-md shadow-lg popup_modal-delete">
                                             <div className="popup_modal-title">
                                               <span>
                                                 <span className="popup_modal-title-icon">
@@ -1164,9 +1137,9 @@ function Dashboard() {
                                                 Delete
                                               </button>
                                             </div>
-                                          </Box>
-                                        </Fade>
-                                      </Modal>
+                                          </div>
+                                        </div>
+                                      )}
                                     </tr>
                                   ))
                                 ) : (

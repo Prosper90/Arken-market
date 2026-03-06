@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LuBot, LuUser } from 'react-icons/lu';
+import { LuBot, LuUser, LuShieldCheck } from 'react-icons/lu';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { postMethod } from '../../core/sevice/common.api';
@@ -387,15 +387,23 @@ const CreateMarket = () => {
               onClick={() => setOracleType('ai')}
             >
               <div className="cm_oracleIcon"><LuBot size={24} /></div>
-              <div className="cm_oracleName">AI Oracle</div>
+              <div className="cm_oracleName">Olympus AI</div>
               <div className="cm_oracleDesc">Auto-resolve</div>
+            </div>
+            <div
+              className={`cm_oracleCard${oracleType === 'uma' ? ' active' : ''}`}
+              onClick={() => setOracleType('uma')}
+            >
+              <div className="cm_oracleIcon"><LuShieldCheck size={24} /></div>
+              <div className="cm_oracleName">UMA Oracle</div>
+              <div className="cm_oracleDesc">On-chain verify</div>
             </div>
             <div
               className={`cm_oracleCard${oracleType === 'manual' ? ' active' : ''}`}
               onClick={() => setOracleType('manual')}
             >
               <div className="cm_oracleIcon"><LuUser size={24} /></div>
-              <div className="cm_oracleName">Manual</div>
+              <div className="cm_oracleName">Personal</div>
               <div className="cm_oracleDesc">Admin resolves</div>
             </div>
           </div>

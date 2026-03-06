@@ -11,19 +11,14 @@ import { FaFilter } from "react-icons/fa6";
 import { toast } from "react-toastify";
 import CsvDownloader from "react-csv-downloader";
 import { MdAddCircle } from "react-icons/md";
-import Slider from '@mui/material/Slider';
 import Select from "react-select";
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 import { FiCheck } from "react-icons/fi";
 import { IoAddCircleSharp } from "react-icons/io5";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { IoIosArrowDown } from "react-icons/io";
 import { BsPerson } from "react-icons/bs";
-import { LuBrainCog } from "react-icons/lu";
+import { LuBrainCog, LuShieldCheck } from "react-icons/lu";
 import { AiFillCheckCircle } from "react-icons/ai";
 import { IoClose } from "react-icons/io5";
 import { postMethod } from "../../core/service/common.api";
@@ -32,15 +27,6 @@ import { FaRegCalendarAlt } from "react-icons/fa";
 import axios from "axios";
 import { LuLockKeyholeOpen } from "react-icons/lu";
 import { env } from "../../core/service/envconfig";
-import { Typography } from "@mui/material";
-
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 const MarketCreaction = () => {
   const [loader, setLoader] = useState(false);
@@ -306,7 +292,7 @@ const [sliderValue, setSliderValue] = useState({});
     endDate: '', 
     active: '',      
     image: "",
-    resolution: 1,
+    oracleType: "manual",
     minimumLiquidity: "10",
     estimatedNetworkFee: "10.50",
     OracleFixedFee: "0.50",
@@ -340,7 +326,7 @@ const [sliderValue, setSliderValue] = useState({});
     endDate: "",
     active: true,
     image: "",
-    resolution: 1,
+    oracleType: "manual",
     minimumLiquidity: "10",
     estimatedNetworkFee: "10.50",
     OracleFixedFee: "0.50",
@@ -484,7 +470,7 @@ function validate(name, value) {
       startDate: "",
       endDate: "",
       active: "",
-      resolution: 1,
+      oracleType: "manual",
       minimumLiquidity: "10",
       estimatedNetworkFee: "10.50",
       OracleFixedFee: "0.50",
@@ -1127,24 +1113,8 @@ const handleEdit = (item) => {
       {/* )} */}
 
       {open && (
-        <Modal
-          aria-labelledby="transition-modal-title"
-          aria-describedby="transition-modal-description"
-          open={open}
-          onClose={() => {
-            handleReset();
-            handleClose();
-          }}
-          closeAfterTransition
-          slots={{ backdrop: Backdrop }}
-          slotProps={{
-            backdrop: {
-              timeout: 500,
-            },
-          }}
-        >
-          <Fade in={open}>
-            <Box sx={style} className="popup_modal-eventCrtn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-eventCrtn">
               <div className={`evnt_crct_popInsd `}>
                 <span
                   className="modal_close_icon cursor-pointer"
@@ -1698,8 +1668,13 @@ const handleEdit = (item) => {
   <div className="evnt_slider_lin">
     <span className="evnt_slider_linlb">1%</span>
 
-    <Slider
-      className={`evnt_slider_main${option.value}`}
+    <input
+      type="range"
+      className={`evnt_slider_main${option.value} w-full accent-yellow-400`}
+      min={0}
+      max={100}
+      step={1}
+      value={sliderValue[option.value] || 0}
       onChange={(e) => {
         const val = Number(e.target.value);
 
@@ -1717,10 +1692,6 @@ const handleEdit = (item) => {
           ),
         }));
       }}
-      defaultValue={0}
-      aria-label={option.value}
-      valueLabelDisplay="auto"
-      value={sliderValue[option.value] || 0}
     />
 
     <span className="evnt_slider_linlb">100%</span>
@@ -1783,10 +1754,10 @@ const handleEdit = (item) => {
                       <div className="manul_rsl_row">
                         <div
                           className={`manul_rsl_crd ${
-                            formData.resolution === 1 ? "active" : ""
+                            formData.oracleType === "manual" ? "active" : ""
                           }`}
                           onClick={() =>
-                            handleResolutionSelect("resolution", 1)
+                            handleResolutionSelect("oracleType", "manual")
                           }
                         >
                           <div className="manul_rsl_iconWrp">
@@ -1795,30 +1766,45 @@ const handleEdit = (item) => {
                           </div>
                           <h6>Manual Resolution</h6>
                           <p>
-                            You decide the outcome yourself once the event ends.
-                            Ideal for trusted creators or community-drive
-                            markets{" "}
+                            Admin decides the outcome once the event ends.
+                            Ideal for trusted or community-driven markets.
                           </p>
                         </div>
                         <div
                           className={`manul_rsl_crd ${
-                            formData.resolution === 2 ? "active" : ""
+                            formData.oracleType === "ai" ? "active" : ""
                           }`}
                           onClick={() =>
-                            handleResolutionSelect("resolution", 2)
+                            handleResolutionSelect("oracleType", "ai")
                           }
                         >
                           <div className="manul_rsl_iconWrp">
                             <LuBrainCog className="manul_rsl_iconfst" />
                             <AiFillCheckCircle className="manul_rsl_icontick" />
                           </div>
-                          <h6>Ai-Powered Resolution</h6>
+                          <h6>Olympus AI</h6>
                           <p>
-                            Let our AI verify results from multiple data sources
-                            and automatically reslove the market with full
-                            transparency and audit trails{" "}
+                            Olympus AI verifies results from multiple data
+                            sources and resolves the market automatically.
                           </p>
-                          <span>Powered By</span>
+                        </div>
+                        <div
+                          className={`manul_rsl_crd ${
+                            formData.oracleType === "uma" ? "active" : ""
+                          }`}
+                          onClick={() =>
+                            handleResolutionSelect("oracleType", "uma")
+                          }
+                        >
+                          <div className="manul_rsl_iconWrp">
+                            <LuShieldCheck className="manul_rsl_iconfst" />
+                            <AiFillCheckCircle className="manul_rsl_icontick" />
+                          </div>
+                          <h6>UMA Oracle</h6>
+                          <p>
+                            Decentralised on-chain resolution via UMA's
+                            Optimistic Oracle. Cryptographically verifiable.
+                          </p>
                         </div>
                       </div>
                     </form>
@@ -1844,30 +1830,13 @@ const handleEdit = (item) => {
                   </div>
                 ) : null}
               </div>
-            </Box>
-          </Fade>
-        </Modal>
+          </div>
+        </div>
       )}
 
       {edit && (
-        <Modal
-          aria-labelledby="transition-modal-title"
-          aria-describedby="transition-modal-description"
-          open={edit}
-          onClose={() => {
-            handleReset();
-            setEdit(false);
-          }}
-          closeAfterTransition
-          slots={{ backdrop: Backdrop }}
-          slotProps={{
-            backdrop: {
-              timeout: 500,
-            },
-          }}
-        >
-          <Fade in={edit}>
-            <Box sx={style} className="popup_modal-eventCrtn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-eventCrtn">
               <div className={`evnt_crct_popInsd `}>
                 <span
                   className="modal_close_icon cursor-pointer"
@@ -2388,8 +2357,13 @@ const handleEdit = (item) => {
   <div className="evnt_slider_lin">
     <span className="evnt_slider_linlb">1%</span>
 
-    <Slider
-      className={`evnt_slider_main${option.value}`}
+    <input
+      type="range"
+      className={`evnt_slider_main${option.value} w-full accent-yellow-400`}
+      min={0}
+      max={100}
+      step={1}
+      value={sliderValue[option.value] || 0}
       onChange={(e) => {
         const val = Number(e.target.value);
 
@@ -2407,10 +2381,6 @@ const handleEdit = (item) => {
           ),
         }));
       }}
-      defaultValue={0}
-      aria-label={option.value}
-      valueLabelDisplay="auto"
-      value={sliderValue[option.value] || 0}
     />
 
     <span className="evnt_slider_linlb">100%</span>
@@ -2469,10 +2439,10 @@ const handleEdit = (item) => {
                       <div className="manul_rsl_row">
                         <div
                           className={`manul_rsl_crd ${
-                            formData.resolution === 1 ? "active" : ""
+                            formData.oracleType === "manual" ? "active" : ""
                           }`}
                           onClick={() =>
-                            handleResolutionSelect("resolution", 1)
+                            handleResolutionSelect("oracleType", "manual")
                           }
                         >
                           <div className="manul_rsl_iconWrp">
@@ -2481,30 +2451,45 @@ const handleEdit = (item) => {
                           </div>
                           <h6>Manual Resolution</h6>
                           <p>
-                            You decide the outcome yourself once the event ends.
-                            Ideal for trusted creators or community-drive
-                            markets{" "}
+                            Admin decides the outcome once the event ends.
+                            Ideal for trusted or community-driven markets.
                           </p>
                         </div>
                         <div
                           className={`manul_rsl_crd ${
-                            formData.resolution === 2 ? "active" : ""
+                            formData.oracleType === "ai" ? "active" : ""
                           }`}
                           onClick={() =>
-                            handleResolutionSelect("resolution", 2)
+                            handleResolutionSelect("oracleType", "ai")
                           }
                         >
                           <div className="manul_rsl_iconWrp">
                             <LuBrainCog className="manul_rsl_iconfst" />
                             <AiFillCheckCircle className="manul_rsl_icontick" />
                           </div>
-                          <h6>Ai-Powered Resolution</h6>
+                          <h6>Olympus AI</h6>
                           <p>
-                            Let our AI verify results from multiple data sources
-                            and automatically reslove the market with full
-                            transparency and audit trails{" "}
+                            Olympus AI verifies results from multiple data
+                            sources and resolves the market automatically.
                           </p>
-                          <span>Powered By</span>
+                        </div>
+                        <div
+                          className={`manul_rsl_crd ${
+                            formData.oracleType === "uma" ? "active" : ""
+                          }`}
+                          onClick={() =>
+                            handleResolutionSelect("oracleType", "uma")
+                          }
+                        >
+                          <div className="manul_rsl_iconWrp">
+                            <LuShieldCheck className="manul_rsl_iconfst" />
+                            <AiFillCheckCircle className="manul_rsl_icontick" />
+                          </div>
+                          <h6>UMA Oracle</h6>
+                          <p>
+                            Decentralised on-chain resolution via UMA's
+                            Optimistic Oracle. Cryptographically verifiable.
+                          </p>
                         </div>
                       </div>
                     </form>
@@ -2534,33 +2519,22 @@ const handleEdit = (item) => {
                   </div>
                 ) : null}
               </div>
-            </Box>
-          </Fade>
-        </Modal>
+          </div>
+        </div>
       )}
 
-      <Modal
-        open={deleteModal.modal}
-        onClose={() => setDeleteModal({ item: "", modal: false })}
-        aria-labelledby="transition-modal-title"
-        aria-describedby="transition-modal-description"
-        closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            timeout: 500,
-          },
-        }}
-      >
-        <Box sx={style} className="popup_modal-delEvntCrtn">
-          <Typography id="modal-modal-title" variant="h6" component="h2">
+      {deleteModal.modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="popup_modal-delete">
+          <div className="popup_modal-delEvntCrtn">
+          <div id="modal-modal-title">
             Are You sure you want to delete ?
-          </Typography>
+          </div>
           <p className="text-center">
             This will delete all the associated data with this event
           </p>
 
-          <Box className="popup_modal-delEvntCrtn-btnWrp">
+          <div className="popup_modal-delEvntCrtn-btnWrp">
             <button
               className="evnt_crct_popBackBtn"
               onClick={() => setDeleteModal({ item: "", modal: false })}
@@ -2573,9 +2547,11 @@ const handleEdit = (item) => {
             >
               Delete
             </button>
-          </Box>
-        </Box>
-      </Modal>
+          </div>
+          </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

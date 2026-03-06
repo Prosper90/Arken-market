@@ -14,7 +14,7 @@ import apiService from "../core/service/detail";
 import useState from "react-usestateref";
 import { useFormik } from "formik";
 import * as Yup from "yup";
-import { Skeleton } from "@mui/material";
+
 
 const customStyles = {
   control: (styles) => ({
@@ -144,10 +144,9 @@ const ReferralRewardSettings = () => {
 
               {siteLoader ? (
                 <div className="currencyinput pt-0 pl-5 w-100">
-                  <Skeleton
-                    variant="text"
-                    className="skl_dsh_user_icon skl_dsh_user_hight"
-                  />
+                  <div
+                    className="bg-[#b8b8b833] animate-pulse skl_dsh_user_icon skl_dsh_user_hight"
+                  ></div>
                   {/* <ScaleLoader color="#dfc822" height={60} width={5} />
                     <p style={{ marginTop: "10px" }}></p> */}
                 </div>

@@ -1,7 +1,6 @@
-/* code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
-} */
+@import "tailwindcss";
+
+/* Rest of your existing CSS */
 
 * {
   margin: 0;
@@ -12,7 +11,7 @@
 :root {
   --ff-primary: "Plus Jakarta Sans", sans-serif !important;
 
-  --primary-clr: #7F3BED;
+  --primary-clr: #7f3bed;
   --clr-accent-400: #121418;
   --border-primary: #3a3e46;
 
@@ -52,11 +51,11 @@ div {
   font-family: "Plus Jakarta Sans", sans-serif;
 }
 
-.side_bar_newIcn{
-    font-size: 22px;
-    color: #ffff;
+.side_bar_newIcn {
+  font-size: 22px;
+  color: #ffff;
 }
 
-.navlink_new.active .side_bar_newIcn{
-  color: #7F3BED;
+.navlink_new.active .side_bar_newIcn {
+  color: #7f3bed;
 }

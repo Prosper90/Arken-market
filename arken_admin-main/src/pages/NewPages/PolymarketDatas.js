@@ -12,10 +12,6 @@ import { toast } from "react-toastify";
 import CsvDownloader from "react-csv-downloader";
 import { MdAddCircle } from "react-icons/md";
 
-import Box from "@mui/material/Box";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 import { FiCheck } from "react-icons/fi";
 import { IoAddCircleSharp } from "react-icons/io5";
 import DatePicker from "react-datepicker";
@@ -30,15 +26,7 @@ import apiService from "../../core/service/detail";
 import { FaRegCalendarAlt } from "react-icons/fa";
 import axios from "axios";
 import { env } from "../../core/service/envconfig";
-import { Typography } from "@mui/material";
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 const PolymarketCreaction = () => {
   const [loader, setLoader] = useState(false);

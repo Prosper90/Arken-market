@@ -22,7 +22,7 @@ import { Bars } from "react-loader-spinner";
 import Box from "@mui/material/Box";
 import Fade from "@mui/material/Fade";
 import Backdrop from "@mui/material/Backdrop";
-import { Skeleton } from "@mui/material";
+
 
 const style = {
   position: "absolute",
@@ -451,15 +451,9 @@ function Dashboard() {
                                     {Array.from({ length: cols }).map(
                                       (_, colIndex) => (
                                         <td key={colIndex}>
-                                          <Skeleton
-                                            variant="rounded"
-                                            height={22}
-                                            sx={{
-                                              bgcolor: "#b8b8b833",
-                                              borderRadius: "6px",
-                                            }}
-                                          />
-                                        </td>
+                                                                                  <div
+                                                                                    className="w-full h-[22px] bg-[#b8b8b833] rounded-[6px] animate-pulse"
+                                                                                  ></div>                                        </td>
                                       )
                                     )}
                                   </tr>

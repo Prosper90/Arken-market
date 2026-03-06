@@ -12,11 +12,7 @@ import { toast } from "react-toastify";
 import CsvDownloader from "react-csv-downloader";
 import { MdAddCircle } from "react-icons/md";
 import FromDatePicker from "../fromdatepicker";
-import Box from "@mui/material/Box";
 import Select from "react-select";
-import Modal from "@mui/material/Modal";
-import Fade from "@mui/material/Fade";
-import Backdrop from "@mui/material/Backdrop";
 
 
 const customStyles = {
@@ -66,13 +62,6 @@ const customStyles = {
   }),
 };
 
-const style = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  boxShadow: 24,
-};
 
 const UsersStake = () => {
 
@@ -425,15 +414,9 @@ const [buttonLoading, setButtonLoading] = useState(false);
                                 </div>
                             </div>
 
-                            <Modal
-  open={editOpen}
-  onClose={() => setEditOpen(false)}
-  closeAfterTransition
-  slots={{ backdrop: Backdrop }}
-  slotProps={{ backdrop: { timeout: 500 } }}
->
-  <Fade in={editOpen}>
-    <Box sx={style} className="popup_modal-delete">
+                            {editOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="popup_modal-delete">
 
       <div className="popup_modal-title">
         <span>Edit Group Commission</span>
@@ -465,7 +448,7 @@ const [buttonLoading, setButtonLoading] = useState(false);
           </div>
         </div>
 
-        {/* ✅ Commission (EDITABLE) */}
+        {/* Commission (EDITABLE) */}
         <div className="form-group row">
           <label className="col-lg-4 col-form-label">
             Commission % <span style={{ color: "red" }}>*</span>
@@ -530,9 +513,9 @@ const [buttonLoading, setButtonLoading] = useState(false);
         </button>
       </div>
 
-    </Box>
-  </Fade>
-</Modal>
+    </div>
+  </div>
+)}
                             {/* )} */}
                         </div>
                     </>
