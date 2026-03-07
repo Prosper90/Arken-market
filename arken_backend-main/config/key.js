@@ -20,6 +20,8 @@ let key = {};
   'http://localhost:5000',
   'http://localhost:3033',
   'https://arken.market',
+  'https://app.arken.market',
+  'https://admin.arken.market',
   process.env.FRONTEND_URL,
 ].filter(Boolean),
 
