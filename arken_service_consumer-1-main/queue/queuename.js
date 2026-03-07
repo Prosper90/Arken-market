@@ -61,6 +61,7 @@ const queueNamelist = {
   createUserMarket: "createUserMarket",
   submitUMAAssertion: "submitUMAAssertion",
   joinPrivateMarket: "joinPrivateMarket",
+  confirmJoinPrivateMarket: "confirmJoinPrivateMarket",
   disputeMarket: "disputeMarket",
   getUserMarkets: "getUserMarkets",
 

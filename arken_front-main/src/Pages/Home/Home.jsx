@@ -404,10 +404,9 @@ const getMarketsStats = async (isLoadMore = false, selectedCategory = category,s
         limit: 10,
         cursor: isLoadMore ? cursorRef.current : null,
         category: selectedCategory === "All" ? null : selectedCategory,
-        subcategory:
-          selectedSubcategory === "All" ? null : selectedSubcategory,
-          search: searchText || null,
-
+        subcategory: selectedSubcategory === "All" ? null : selectedSubcategory,
+        search: searchText || null,
+        telegramId: telegramUser?.telegramId || null,
       },
     };
 
@@ -503,9 +502,13 @@ useEffect(() => {
         payload: { inviteCode: code, telegramId: tid },
       });
       if (resp && resp.success) {
-        toast.success('Joined! Refreshing markets...');
         setJoinCode('');
-        getMarketsStats(false, tabName, subTitleName);
+        if (resp.alreadyJoined) {
+          toast.success('Already joined — refreshing...');
+          getMarketsStats(false, tabName, subTitleName);
+        } else {
+          navigation('/join-private-market', { state: { market: resp.market, telegramId: tid } });
+        }
       } else {
         toast.error(resp?.message || 'Invalid invite code');
       }

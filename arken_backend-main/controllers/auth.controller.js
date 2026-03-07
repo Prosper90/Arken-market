@@ -885,3 +885,14 @@ exports.getUserMarketsHandler = async (req, res) => {
     ...result,
   });
 };
+
+exports.confirmJoinPrivateMarketHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.confirmJoinPrivateMarket,
+  });
+  res.json({
+    action: queuename.confirmJoinPrivateMarket,
+    ...result,
+  });
+};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LuBot, LuUser, LuShieldCheck } from 'react-icons/lu';
+import { LuBot, LuShieldCheck } from 'react-icons/lu';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { postMethod } from '../../core/sevice/common.api';
@@ -29,7 +29,7 @@ const CreateMarket = () => {
   const [outcomes, setOutcomes] = useState(['Yes', 'No']);
   const [endDate, setEndDate] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [oracleType, setOracleType] = useState('manual');
+  const [oracleType, setOracleType] = useState('ai');
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(null);
 
@@ -397,14 +397,6 @@ const CreateMarket = () => {
               <div className="cm_oracleIcon"><LuShieldCheck size={24} /></div>
               <div className="cm_oracleName">UMA Oracle</div>
               <div className="cm_oracleDesc">On-chain verify</div>
-            </div>
-            <div
-              className={`cm_oracleCard${oracleType === 'manual' ? ' active' : ''}`}
-              onClick={() => setOracleType('manual')}
-            >
-              <div className="cm_oracleIcon"><LuUser size={24} /></div>
-              <div className="cm_oracleName">Personal</div>
-              <div className="cm_oracleDesc">Admin resolves</div>
             </div>
           </div>
         </div>

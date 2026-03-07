@@ -36,6 +36,7 @@ getReferralInfo:"user/getReferralInfo",
 createUserMarket: "user/createMarket",
 submitUMAAssertion: "user/submitUMAAssertion",
 joinPrivateMarket: "user/joinPrivateMarket",
+confirmJoinPrivateMarket: "user/confirmJoinPrivateMarket",
 disputeMarket: "user/disputeMarket",
 mymarkets: "user/my-markets",
 

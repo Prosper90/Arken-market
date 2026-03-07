@@ -95,8 +95,8 @@ services:
     build:
       context: ./arken_admin-main
       args:
-        REACT_APP_APISERVICE_MAIN: https://arken.market/
-        REACT_APP_siteUrl: https://arken.market
+        REACT_APP_APISERVICE_MAIN: https://app.arken.market/api/
+        REACT_APP_siteUrl: https://app.arken.market
     container_name: admin-panel
     restart: always
     ports:

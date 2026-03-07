@@ -1489,6 +1489,8 @@ async function getMergedMarketsHandler(data) {
 
     const cursorQuery = cursor ? { startDate: { $lt: cursor } } : {};
 
+    const telegramId = data?.telegramId || null;
+
     let categoryQuery = {};
     let subcategoryQuery = {};
     let newQuery = {};
@@ -1560,9 +1562,14 @@ async function getMergedMarketsHandler(data) {
     let taggedManualMarkets = [];
 
     if (!polyOnly) {
+      const privateFilter = telegramId
+        ? { $or: [{ isPrivate: { $ne: true } }, { allowedTelegramIds: telegramId }] }
+        : { isPrivate: { $ne: true } };
+
       const manualQuery = {
         active: true,
         endDate: { $gte: new Date() },
+        ...privateFilter,
         ...cursorQuery,
         ...(manualOnly ? {} : categoryQuery),
         ...subcategoryQuery,
@@ -6055,25 +6062,123 @@ async function joinPrivateMarketHandler(data) {
       return { status: false, message: "Invite code and Telegram ID required" };
     }
 
-    const market = await Market.findOne({ inviteCode: inviteCode.toUpperCase() });
+    const market = await Market.findOne({ inviteCode: inviteCode.toUpperCase() }).lean();
     if (!market) return { status: false, message: "Invalid invite code" };
     if (!market.isPrivate) return { status: false, message: "Market is not private" };
-    if (market.allowedTelegramIds.includes(telegramId)) {
-      return { status: true, success: true, message: "Already joined", market };
+    if (!market.active || market.endDate < new Date()) {
+      return { status: false, message: "This market is no longer active" };
+    }
+    const alreadyJoined = market.allowedTelegramIds.map(String).includes(String(telegramId));
+
+    return {
+      status: true,
+      success: true,
+      alreadyJoined,
+      message: alreadyJoined ? "Already joined this market" : "Valid invite code",
+      market: {
+        _id: market._id,
+        question: market.question,
+        description: market.description,
+        outcomes: market.outcomes,
+        outcomePrices: market.outcomePrices,
+        chancePercents: market.chancePercents,
+        endDate: market.endDate,
+        liquidity: market.liquidity,
+        minimumLiquidity: market.minimumLiquidity,
+      },
+    };
+  } catch (error) {
+    console.error("joinPrivateMarketHandler error:", error);
+    return { status: false, message: "Something went wrong" };
+  }
+}
+
+async function confirmJoinPrivateMarketHandler(data) {
+  try {
+    const { telegramId, marketId, outcomeIndex, outcomeLabel, amount } = data;
+
+    if (!telegramId || !marketId || outcomeIndex === undefined || !amount) {
+      return { status: false, message: "Missing required fields" };
     }
 
-    await Market.findByIdAndUpdate(market._id, {
+    const market = await Market.findById(marketId);
+    if (!market) return { status: false, message: "Market not found" };
+    if (!market.isPrivate) return { status: false, message: "Not a private market" };
+    if (!market.active || market.endDate < new Date()) {
+      return { status: false, message: "Market is no longer active" };
+    }
+
+    const user = await usersDB.findOne({ telegramId: String(telegramId) });
+    if (!user) return { status: false, message: "User not found" };
+
+    const feeSettings = await PlatformFeeSettings.findOne({ status: true });
+    const feePercent = feeSettings ? feeSettings.feePercentage : 3;
+    const platformFee = (Number(amount) * feePercent) / 100;
+    const totalRequired = Number(amount) + platformFee;
+
+    const { balance: pubBalance } = await getBalance(telegramId);
+    if (pubBalance < totalRequired) {
+      return {
+        status: false,
+        message: `Insufficient balance. You have $${pubBalance.toFixed(2)}, need $${totalRequired.toFixed(2)}`,
+      };
+    }
+
+    await UserPublicWallet.updateOne(
+      { telegramId: String(telegramId) },
+      { $inc: { balance: -totalRequired, holdBalance: +Number(amount) } }
+    );
+
+    const odds = market.outcomePrices?.[outcomeIndex] || 0.5;
+    const shares = Number(amount) / odds;
+
+    await Prediction.create({
+      userId: user._id,
+      telegramId,
+      groupId: null,
+      chatType: "private",
+      question: market.question,
+      manualId: market._id,
+      outcomeIndex,
+      outcomeLabel: outcomeLabel || market.outcomes?.[outcomeIndex] || "",
+      amount,
+      odds,
+      shares,
+      avgPrice: odds,
+      currentPrice: odds,
+      potentialPayout: shares,
+      potentialProfit: shares - Number(amount),
+      currency: "USDC",
+      deductedFrom: "userPublicWallet",
+      status: "OPEN",
+      source: "manual",
+    });
+
+    user.totalPredictions += 1;
+    await user.save();
+
+    // Credit market creator's fee share
+    const creatorCut = market.creatorTelegramId ? platformFee * 0.25 : 0;
+    if (creatorCut > 0) {
+      await UserPublicWallet.updateOne(
+        { telegramId: String(market.creatorTelegramId) },
+        { $inc: { balance: creatorCut } },
+        { upsert: true }
+      );
+    }
+
+    // Add to allowedTelegramIds
+    await Market.findByIdAndUpdate(marketId, {
       $addToSet: { allowedTelegramIds: telegramId },
     });
 
     return {
       status: true,
       success: true,
-      message: "Successfully joined private market",
-      market: { _id: market._id, question: market.question },
+      message: "Successfully joined and placed your bet!",
     };
   } catch (error) {
-    console.error("joinPrivateMarketHandler error:", error);
+    console.error("confirmJoinPrivateMarketHandler error:", error);
     return { status: false, message: "Something went wrong" };
   }
 }
@@ -6170,8 +6275,12 @@ async function getUserMarketsHandler(data) {
   try {
     const { telegramId } = data;
     if (!telegramId) return { success: false, message: "Missing telegramId" };
-    const userMarkets = await markets
-      .find({ creatorTelegramId: String(telegramId) })
+    const userMarkets = await Market.find({
+      $or: [
+        { creatorTelegramId: String(telegramId) },
+        { allowedTelegramIds: telegramId, isPrivate: true },
+      ],
+    })
       .sort({ createdAt: -1 })
       .lean();
     return { success: true, data: userMarkets };
@@ -6215,6 +6324,7 @@ module.exports = {
   createUserMarketHandler,
   submitUMAAssertionHandler,
   joinPrivateMarketHandler,
+  confirmJoinPrivateMarketHandler,
   disputeMarketHandler,
   getUserMarketsHandler,
 };

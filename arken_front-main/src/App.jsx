@@ -21,6 +21,7 @@ import WalletSuccess from './Pages/success/WalletSuccess'
 import PayRedirect from './Pages/PayRedirect/PayRedirect'
 import Waletss from "./Pages/Onboarding/wallet"
 import CreateMarket from './Pages/CreateMarket/CreateMarket'
+import JoinPrivateMarket from './Pages/JoinPrivateMarket/JoinPrivateMarket'
 import {MarketProvider} from './context/MarketContext'
 import {TelegramUserProvider} from './context/TelegramUserContext'
 import { Toaster } from "react-hot-toast";
@@ -69,6 +70,7 @@ function RequireAuth({ children }) {
           <Route path="/wallet-success" element={<WalletSuccess />} />
           <Route path="/pay-redirect" element={<PayRedirect />} />
           <Route path="/create-market" element={<CreateMarket />} />
+          <Route path="/join-private-market" element={<JoinPrivateMarket />} />
         </Routes>
      
       </BrowserRouter>
