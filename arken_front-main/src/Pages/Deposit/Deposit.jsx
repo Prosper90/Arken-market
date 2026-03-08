@@ -83,6 +83,7 @@ const Deposit = () => {
   const [touched, setTouched] = useState({});
   const [Address, setAddress,Addressref] = useState(localStorage.getItem("walletAddress"));
   const [depositHistory, setDepositHistory] = useState([]);
+  const [withdrawHistory, setWithdrawHistory] = useState([]);
     const { sendTransactionAsync: sendEvmTx } = useSendTransaction();
 
   const handleStepReduce = () => {
@@ -468,6 +469,12 @@ console.log(error,"dsfdsfs")
     postMethod({ apiUrl: apiService.get_user_balance, payload: { telegramId: tid } })
       .then((resp) => {
         if (resp?.success) setWithdrawBalance(resp.totalUsdt ?? null);
+      })
+      .catch(() => {});
+    // Fetch withdraw history
+    postMethod({ apiUrl: apiService.get_withdraw_list, payload: { telegramId: tid } })
+      .then((resp) => {
+        if (resp?.success && Array.isArray(resp.data)) setWithdrawHistory(resp.data);
       })
       .catch(() => {});
   }, [activeTab, telegramUser?.telegramId, teleId]);
@@ -2142,7 +2149,7 @@ const getTransaction = async () => {
                         <button
                           className="deponbord_subtbtn"
                           style={pageStyle.deponbord_subtbtn}
-                        > 
+                        >
                           Loading...
                         </button>
                       ) : (
@@ -2153,6 +2160,46 @@ const getTransaction = async () => {
                         >
                           Withdraw
                         </button>
+                      )}
+
+                      {/* Withdraw History */}
+                      {withdrawHistory.length > 0 && (
+                        <div style={{ marginTop: "24px" }}>
+                          <p style={{ color: "#fff", fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>
+                            Withdraw History
+                          </p>
+                          {withdrawHistory.map((item, idx) => {
+                            const statusMap = { 0: "Pending", 1: "Processing", 2: "Completed", 3: "Cancelled", 4: "Rejected" };
+                            const colorMap = { 0: "#fbbf24", 1: "#60a5fa", 2: "#4ade80", 3: "#f87171", 4: "#f87171" };
+                            return (
+                              <div key={idx} style={{
+                                background: "rgba(255,255,255,0.06)",
+                                borderRadius: "10px",
+                                padding: "12px 16px",
+                                marginBottom: "10px",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}>
+                                <div>
+                                  <p style={{ color: "#fff", fontSize: "14px", margin: 0, fontWeight: 600 }}>
+                                    {item.amount} {item.currency_symbol}
+                                  </p>
+                                  <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "11px", margin: "4px 0 0" }}>
+                                    {new Date(item.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <span style={{
+                                  fontSize: "12px",
+                                  fontWeight: 700,
+                                  color: colorMap[item.status] || "#fbbf24",
+                                }}>
+                                  {statusMap[item.status] || "Pending"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
                   )}

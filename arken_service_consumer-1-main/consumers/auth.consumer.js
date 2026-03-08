@@ -1,5 +1,5 @@
 const { getChannel } = require('../rabbit');;
-const { getMergedMarketsHandler,verifyTelegramWebAppHandler,disconnectWalletHandler,getUserByTelegramIdHandler,getDappKeyHandler,getUniqueIdHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,getMergedMarketByIdHandler,userDepositListHandler,UniqueIdHandler,verify_UniqueIdHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId,getAddress,creat_new_wallet,send_otp,resend_otp,verify_otp,get_deposit_list,getReferralInfoHandler,createUserMarketHandler,submitUMAAssertionHandler,joinPrivateMarketHandler,confirmJoinPrivateMarketHandler,disputeMarketHandler,getUserMarketsHandler} = require('../services/auth.service');
+const { getMergedMarketsHandler,verifyTelegramWebAppHandler,disconnectWalletHandler,getUserByTelegramIdHandler,getDappKeyHandler,getUniqueIdHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,getMergedMarketByIdHandler,userDepositListHandler,UniqueIdHandler,verify_UniqueIdHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId,getAddress,creat_new_wallet,send_otp,resend_otp,verify_otp,get_deposit_list,getReferralInfoHandler,createUserMarketHandler,submitUMAAssertionHandler,joinPrivateMarketHandler,confirmJoinPrivateMarketHandler,disputeMarketHandler,getUserMarketsHandler,getUserWithdrawList} = require('../services/auth.service');
 // const { getMergedMarketsHandler,verifyTelegramWebAppHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,userDepositListHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId, getMergedMarketByIdHandler} = require('../services/auth.service');
 const queuename = require("../queue/queuename");
 
@@ -554,6 +554,8 @@ channel.ack(msg);
         result = await disputeMarketHandler(data);
       } else if (data.action === queuename.getUserMarkets) {
         result = await getUserMarketsHandler(data);
+      } else if (data.action === queuename.getUserWithdrawList) {
+        result = await getUserWithdrawList(data);
       }
 
       if (!data.action) {

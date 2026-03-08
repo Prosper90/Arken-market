@@ -193,7 +193,7 @@ const SolanaRoot = () => {
     new SolflareWalletAdapter({
       // Your actual website URL
       appUrl: import.meta.env.VITE_FRONT_URL || 'https://arken.blfdemo.online',
-      redirectLink: 'https://t.me/ArkenBot/app' 
+      redirectLink: (import.meta.env.VITE_BOT_URL || 'https://t.me/Arkenmarketbot') + '/app'
     }),
     new PhantomWalletAdapter()
   ], []);

@@ -731,6 +731,17 @@ async function initializeTelegramBot() {
     const botInfo = await bot.getMe();
     const BOT_USERNAME = botInfo.username;
 
+    // Register bot commands so they appear in the "/" suggestion menu
+    await bot.setMyCommands([
+      { command: "start",    description: "Open Arken mini app" },
+      { command: "wallet",   description: "View your wallet balance" },
+      { command: "deposit",  description: "Deposit USDC or SOL" },
+      { command: "withdraw", description: "Withdraw funds" },
+      { command: "referral", description: "Get your referral link" },
+      { command: "trending", description: "See trending markets" },
+      { command: "bets",     description: "View active betting markets (groups)" },
+    ]).catch(e => console.warn("setMyCommands failed:", e.message));
+
     // Helper: check that the user has a connected wallet before running a command.
     // Returns true if they do; sends an error message and returns false if they don't.
     async function requireWallet(telegramId, chatId) {
@@ -939,6 +950,65 @@ What would you like to do?`,
       });
     });
 
+    // ── /deposit command ───────────────────────────────────────────────────
+    bot.onText(/\/deposit/, async (msg) => {
+      const chatId = msg.chat.id;
+      const telegramId = msg.from.id;
+      const depositUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/deposit?v=3&telegramId=${telegramId}`;
+      const walletDoc = await userWalletDB.findOne({ telegramId });
+      if (!walletDoc || !walletDoc.wallets || !walletDoc.wallets.length) {
+        return bot.sendMessage(chatId, "❌ No wallet found. Open the app to create one.", {
+          reply_markup: {
+            inline_keyboard: [[{ text: "📥 Open Deposit", web_app: { url: depositUrl } }]],
+          },
+        });
+      }
+      let text = "📥 *Deposit Addresses*\n\nSend funds to any of these addresses:\n\n";
+      for (const w of walletDoc.wallets) {
+        text += `*${w.currencySymbol}*\n\`${w.address}\`\n\n`;
+      }
+      text += "⚠️ Only send the correct token to each address.";
+      bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [[{ text: "📥 Open Deposit App", web_app: { url: depositUrl } }]],
+        },
+      });
+    });
+
+    // ── /withdraw command ──────────────────────────────────────────────────
+    bot.onText(/\/withdraw/, async (msg) => {
+      const chatId = msg.chat.id;
+      const telegramId = msg.from.id;
+      const webAppUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/deposit?tab=withdraw&v=3&telegramId=${telegramId}`;
+      bot.sendMessage(chatId,
+        "💸 *Withdraw Funds*\n\nWithdraw your USDC or SOL balance to any wallet address.",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "💸 Open Withdraw", web_app: { url: webAppUrl } }]],
+          },
+        }
+      );
+    });
+
+    // ── /referral command ──────────────────────────────────────────────────
+    bot.onText(/\/referral/, async (msg) => {
+      const chatId = msg.chat.id;
+      const telegramId = msg.from.id;
+      const referralLink = BOT_USERNAME
+        ? `https://t.me/${BOT_USERNAME}?start=ref_${telegramId}`
+        : null;
+      if (referralLink) {
+        bot.sendMessage(chatId,
+          `🎁 *Your Referral Link*\n\nShare this link to earn a cut of every bet your referrals place:\n\n${referralLink}`,
+          { parse_mode: "Markdown" }
+        );
+      } else {
+        bot.sendMessage(chatId, "❌ Referral link unavailable. Please try again later.");
+      }
+    });
+
 //     bot.on("callback_query", async (query) => {
 //       try {
 //         const groupId = query.message.chat.id;
@@ -1093,7 +1163,45 @@ bot.on("callback_query", async (query) => {
     const telegramId = query.from.id;
     const data = query.data;
 
-  
+    // ── Group /bets category callbacks ────────────────────────────────────
+    if (data === "bets_all" || data === "bets_crypto" || data === "bets_others") {
+      bot.answerCallbackQuery(query.id);
+
+      let filter = {};
+      if (data === "bets_crypto") filter.category = "Crypto";
+      if (data === "bets_others") filter.category = { $nin: ["Crypto"] };
+
+      const markets = await Market.find({
+        active: true,
+        endDate: { $gte: new Date() },
+        ...(data !== "bets_all" ? filter : {}),
+      }).limit(10).lean();
+
+      if (!markets.length) {
+        return bot.sendMessage(groupId, "📭 No markets found in this category.");
+      }
+
+      const webAppBase = process.env.MINI_APP_URL || "https://arken.blfdemo.online";
+      const rows = [];
+      for (let i = 0; i < markets.length; i += 2) {
+        const row = [];
+        for (let j = i; j < i + 2 && j < markets.length; j++) {
+          const m = markets[j];
+          const url = `${webAppBase}/market-details/${m._id}?v=3&telegramId=${telegramId}`;
+          row.push({
+            text: m.question.length > 30 ? m.question.slice(0, 30) + "…" : m.question,
+            web_app: { url },
+          });
+        }
+        rows.push(row);
+      }
+
+      return bot.sendMessage(groupId, "📊 *Active Markets* — tap to open:", {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: rows },
+      });
+    }
+
     if (data.startsWith("trending_page_")) {
 
       const PAGE_SIZE = 6;

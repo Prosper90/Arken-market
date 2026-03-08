@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LuBot, LuShieldCheck } from 'react-icons/lu';
+import { LuBot, LuShieldCheck, LuUser } from 'react-icons/lu';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { postMethod } from '../../core/sevice/common.api';
@@ -15,6 +15,12 @@ const equalSplit = (n) => {
   return Array.from({ length: n }, (_, i) => (i === 0 ? base + rem : base));
 };
 
+// Returns a datetime-local string (YYYY-MM-DDTHH:MM) for a given Date
+const toDatetimeLocal = (d) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 const CreateMarket = () => {
   const navigate = useNavigate();
   const { telegramUser } = useTelegramUser();
@@ -28,7 +34,7 @@ const CreateMarket = () => {
   const [isPrivate, setIsPrivate] = useState(false);
   const [outcomes, setOutcomes] = useState(['Yes', 'No']);
   const [endDate, setEndDate] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(toDatetimeLocal(new Date()));
   const [oracleType, setOracleType] = useState('ai');
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(null);
@@ -45,6 +51,11 @@ const CreateMarket = () => {
     setProbabilities(equal);
     setRawInputs(equal.map(String));
   }, [outcomes.length]);
+
+  // Reset oracle type when visibility changes
+  useEffect(() => {
+    setOracleType(isPrivate ? 'manual' : 'ai');
+  }, [isPrivate]);
 
   // ── Outcomes ──────────────────────────────────────────────────────────────
   const addOutcome = () => {
@@ -74,7 +85,6 @@ const CreateMarket = () => {
     const newProbs = [...probabilities];
     newProbs[idx] = val;
 
-    // Distribute remainder across the other slots proportionally
     const rest = 100 - val;
     const others = newProbs.length - 1;
     const base = Math.floor(rest / others);
@@ -100,7 +110,6 @@ const CreateMarket = () => {
     const parsed = parseInt(rawInputs[idx], 10);
     const val = isNaN(parsed) ? probabilities[idx] : Math.min(99, Math.max(1, parsed));
 
-    // Compute redistribution inline so rawInputs stays in sync with probabilities
     const newProbs = [...probabilities];
     newProbs[idx] = val;
     const rest = 100 - val;
@@ -130,11 +139,11 @@ const CreateMarket = () => {
       return;
     }
     if (!endDate || new Date(endDate) <= new Date()) {
-      toast.error('End date must be in the future');
+      toast.error('Resolution date must be in the future');
       return;
     }
     if (endDate && startDate && new Date(startDate) >= new Date(endDate)) {
-      toast.error('Start date must be before resolution date');
+      toast.error('Start date/time must be before resolution date/time');
       return;
     }
     if (tags.length === 0) {
@@ -193,9 +202,12 @@ const CreateMarket = () => {
     }
   };
 
-  const todayMin = new Date();
-  todayMin.setDate(todayMin.getDate() + 1);
-  const minDate = todayMin.toISOString().split('T')[0];
+  // Min for start: now (browser enforces future naturally)
+  const minStart = toDatetimeLocal(new Date());
+  // Min for resolution: at least 1 day from now
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minEnd = toDatetimeLocal(tomorrow);
 
   const netLiquidity = initialLiquidity ? Number(initialLiquidity).toFixed(2) : '0.00';
   const totalCost = initialLiquidity ? (Number(initialLiquidity) + 1).toFixed(2) : '1.00';
@@ -354,25 +366,25 @@ const CreateMarket = () => {
           </span>
         </div>
 
-        {/* Start Date */}
+        {/* Start Date & Time */}
         <div className="cm_field">
-          <label className="cm_label">Start Date</label>
+          <label className="cm_label">Start Date & Time</label>
           <input
-            type="date"
+            type="datetime-local"
             className="cm_dateInput"
-            min={new Date().toISOString().split('T')[0]}
+            min={minStart}
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
           />
         </div>
 
-        {/* End Date */}
+        {/* Resolution Date & Time */}
         <div className="cm_field">
-          <label className="cm_label">Resolution Date</label>
+          <label className="cm_label">Resolution Date & Time</label>
           <input
-            type="date"
+            type="datetime-local"
             className="cm_dateInput"
-            min={minDate}
+            min={minEnd}
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
           />
@@ -382,14 +394,25 @@ const CreateMarket = () => {
         <div className="cm_field">
           <label className="cm_label">Resolution Method</label>
           <div className="cm_oracleWrp">
-            <div
-              className={`cm_oracleCard${oracleType === 'ai' ? ' active' : ''}`}
-              onClick={() => setOracleType('ai')}
-            >
-              <div className="cm_oracleIcon"><LuBot size={24} /></div>
-              <div className="cm_oracleName">Olympus AI</div>
-              <div className="cm_oracleDesc">Auto-resolve</div>
-            </div>
+            {isPrivate ? (
+              <div
+                className={`cm_oracleCard${oracleType === 'manual' ? ' active' : ''}`}
+                onClick={() => setOracleType('manual')}
+              >
+                <div className="cm_oracleIcon"><LuUser size={24} /></div>
+                <div className="cm_oracleName">Manual</div>
+                <div className="cm_oracleDesc">Admin resolves</div>
+              </div>
+            ) : (
+              <div
+                className={`cm_oracleCard${oracleType === 'ai' ? ' active' : ''}`}
+                onClick={() => setOracleType('ai')}
+              >
+                <div className="cm_oracleIcon"><LuBot size={24} /></div>
+                <div className="cm_oracleName">Olympus AI</div>
+                <div className="cm_oracleDesc">Auto-resolve</div>
+              </div>
+            )}
             <div
               className={`cm_oracleCard${oracleType === 'uma' ? ' active' : ''}`}
               onClick={() => setOracleType('uma')}

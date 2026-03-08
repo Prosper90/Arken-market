@@ -896,3 +896,14 @@ exports.confirmJoinPrivateMarketHandler = async (req, res) => {
     ...result,
   });
 };
+
+exports.getUserWithdrawListHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.getUserWithdrawList,
+  });
+  res.json({
+    action: queuename.getUserWithdrawList,
+    ...result,
+  });
+};

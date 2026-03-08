@@ -5907,6 +5907,24 @@ async function get_deposit_list(data) {
   }
 }
 
+async function getUserWithdrawList(data) {
+  try {
+    const { telegramId } = data || {};
+    if (!telegramId) {
+      return { success: false, code: 400, message: "Missing telegramId" };
+    }
+    const WithdrawDB = require("../models/withdraw");
+    const list = await WithdrawDB
+      .find({ telegramId: String(telegramId) })
+      .sort({ created_at: -1 })
+      .lean();
+    return { success: true, data: list };
+  } catch (error) {
+    console.error("getUserWithdrawList error:", error);
+    return { success: false, code: 500, message: "Server error" };
+  }
+}
+
 /**
  * Generate a random 7-character uppercase alphanumeric invite code (e.g. ARKX7K2)
  */
@@ -6327,4 +6345,5 @@ module.exports = {
   confirmJoinPrivateMarketHandler,
   disputeMarketHandler,
   getUserMarketsHandler,
+  getUserWithdrawList,
 };

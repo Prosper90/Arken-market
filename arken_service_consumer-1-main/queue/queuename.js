@@ -64,6 +64,7 @@ const queueNamelist = {
   confirmJoinPrivateMarket: "confirmJoinPrivateMarket",
   disputeMarket: "disputeMarket",
   getUserMarkets: "getUserMarkets",
+  getUserWithdrawList: "getUserWithdrawList",
 
 };
 

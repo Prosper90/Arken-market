@@ -77,6 +77,7 @@ userBalance:"userBalance",
   confirmJoinPrivateMarket: "confirmJoinPrivateMarket",
   disputeMarket: "disputeMarket",
   getUserMarkets: "getUserMarkets",
+  getUserWithdrawList: "getUserWithdrawList",
 };
 
 module.exports = queueNamelist;

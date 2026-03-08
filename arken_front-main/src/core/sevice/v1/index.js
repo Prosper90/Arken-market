@@ -39,6 +39,7 @@ joinPrivateMarket: "user/joinPrivateMarket",
 confirmJoinPrivateMarket: "user/confirmJoinPrivateMarket",
 disputeMarket: "user/disputeMarket",
 mymarkets: "user/my-markets",
+get_withdraw_list: "user/get_withdraw_list",
 
 };
 

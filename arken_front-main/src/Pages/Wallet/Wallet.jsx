@@ -202,6 +202,37 @@ const Wallet = () => {
     return `${address.slice(0, 8)}....${address.slice(-4)}`;
   };
 
+  const handleDisconnect = async () => {
+    try {
+      const name = (userWallet.walletName || localStorage.getItem("walletName") || "").toLowerCase();
+      if (name === "phantom" || name === "solflare") {
+        try {
+          await postMethod({
+            apiUrl: apiService.disconnect_wallet,
+            payload: { uniqueId: userWallet.uniqueId },
+          });
+        } catch (e) {
+          console.error("Disconnect API error:", e);
+        }
+      }
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith("@appkit/"))
+        .forEach((k) => localStorage.removeItem(k));
+      ["walletconnect","wc@2:client","wagmi.recentConnectorId","wagmi.connected",
+       "WALLETCONNECT_DEEPLINK_CHOICE","walletDetails"].forEach((k) => localStorage.removeItem(k));
+      localStorage.setItem("walletAddress", "");
+      localStorage.setItem("walletName", "");
+      setWalletAddress("");
+      setWalletName("");
+      setUserWallet({ isConnected: false, walletAddress: "", walletName: "", uniqueId: "" });
+      toast.success("Wallet disconnected");
+      navigate("/onBoarding");
+    } catch (err) {
+      console.error("Disconnect error:", err);
+      toast.error("Failed to disconnect");
+    }
+  };
+
   useEffect(() => {
     getBalance();
   }, [0]);
@@ -373,6 +404,25 @@ const Wallet = () => {
               </span>
             </div>
           </div>
+
+          <button
+            onClick={handleDisconnect}
+            style={{
+              marginTop: "14px",
+              width: "100%",
+              padding: "10px",
+              borderRadius: "10px",
+              border: "1px solid rgba(239,68,68,0.4)",
+              background: "rgba(239,68,68,0.08)",
+              color: "#ef4444",
+              fontSize: "13px",
+              fontWeight: "600",
+              cursor: "pointer",
+              letterSpacing: "0.3px",
+            }}
+          >
+            Disconnect / Switch Wallet
+          </button>
         </div>
 
         <div className="wllt_winPec_Wrp" style={pageStyle.wllt_winPec_Wrp}>

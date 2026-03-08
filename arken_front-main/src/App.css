@@ -14,6 +14,8 @@
 body{
     height: 100vh;
     background: #000000;
+    touch-action: pan-y;
+    overscroll-behavior: none;
 }
 
 .cmmn_bdy_mainwrp{
