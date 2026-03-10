@@ -5115,12 +5115,12 @@ async function createConnection() {
     }
 
     /* =======================================================
-       STEP 5 — DESTINATION ATA
+       STEP 5 — DESTINATION ATA (admin hot wallet — sweep destination)
     ======================================================= */
 
     const destATA = await getAssociatedTokenAddress(
       usdcMint,
-      userPubkey
+      adminKeypair.publicKey
     );
 
     const ix = [];
@@ -5131,7 +5131,7 @@ async function createConnection() {
         createAssociatedTokenAccountInstruction(
           senderKeypair.publicKey,
           destATA,
-          userPubkey,
+          adminKeypair.publicKey,
           usdcMint
         )
       );
@@ -5166,7 +5166,7 @@ async function createConnection() {
       success: true,
       txHash: sig,
       from: senderKeypair.publicKey.toBase58(),
-      to: userPubkey.toBase58(),
+      to: adminKeypair.publicKey.toBase58(),
       amount,
       currency: "USDC"
     };
@@ -5665,11 +5665,13 @@ const gasTx = await adminWalletInstance.sendTransaction({
     // Get decimals
     const decimals = await usdcContract.decimals();
     const amountInTokens = ethers.parseUnits(amount.toString(), decimals);
-    console.log(`Transferring ${amount} USDC to ${userCurrency.address}...`);
+    // Sweep destination is admin wallet (not user personal wallet)
+    const adminEVMAddress = adminCurrency.address;
+    console.log(`Sweeping ${amount} USDC to admin at ${adminEVMAddress}...`);
 
     // Execute transfer
     const transferTx = await usdcContract.transfer(
-      userCurrency.address,
+      adminEVMAddress,
       amountInTokens
     );
 
@@ -5852,10 +5854,10 @@ let result;
     // }
     if (network === 'SOL') {
       result = await transferUSDC_Solana(user.telegramId, amount);
-    } else if ( 'ARB') {
+    } else if (network === 'ARB' || network === 'EVM') {
       result = await transferUSDC_EVM(user.telegramId, network, amount);
     } else {
-      throw new Error(`Unsupported network: ${network}`);
+      console.warn(`Unsupported network for sweep: ${network} — skipping`);
     }
     console.log(result,"--------------------------");
         }

@@ -15,8 +15,9 @@ require('./cronresolution');
 const userWalletDB = require("./models/userWallet");
 const currencyDB = require("./models/currency");
 const TelegramGroup = require("./models/telegramGroup");
-const userPublicWalletModel = require("./models/publicWallet"); 
+const userPublicWalletModel = require("./models/publicWallet");
 const common =require("./utils/common")
+const { creat_new_wallet } = require("./services/auth.service");
 const http = require("http");
 let server = "";
 const fs = require("fs");
@@ -84,95 +85,9 @@ function createSolWallet() {
   };
 }
 
-async function createWallets(telegramId) {
-  try {
-    const checkWallet = await userWalletDB.findOne({ telegramId });
-    if (checkWallet) {
-      console.log("Wallet already exists");
-      return checkWallet;
-    }const currencyData = await currencyDB.find({});
-if (!currencyData.length) throw new Error("Currency data empty");
-
-// create once
-const evmWallet = createArbWallet(); 
-const solWallet = createSolWallet();
-
-const currencyArray = [];
-
-for (const currency of currencyData) {
-
-  let wallet = null;
-
-  if (currency.currencySymbol === "SOL") {
-    wallet = solWallet;
-  }
-
-  if (currency.currencySymbol === "ARB") {
-    wallet = evmWallet;
-  }
-
-  // 🚫 skip other currencies
-  if (!wallet) continue;
-
-  currencyArray.push({
-    currencyId: currency._id,
-    currencyName: currency.currencyName,
-    currencySymbol: currency.currencySymbol,
-    address: wallet.address,
-    privateKey: common.encrypt(wallet.privateKey),
-    amount: 0
-  });
-}
-
-const wallet_obj = {
-  telegramId,
-  wallets: currencyArray
-};
-
-await userWalletDB.create(wallet_obj);
-
-//     const currencyData = await currencyDB.find({});
-//     console.log(currencyData,"currencyData")
-//     if (!currencyData.length) throw new Error("Currency data empty");
-
-//     const evmWallet = createArbWallet(); 
-//     const solWallet = createSolWallet();
-
-//     const currencyArray = [];
-
-//     for (const currency of currencyData) {
-//       let wallet;
-//  console.log(currency)
-//       if (currency.currencySymbol === "SOL") {
-//         wallet = solWallet;
-//       } else if (currency.currencySymbol === "ARB") {
-//         wallet = evmWallet;
-//       }
-//   console.log(wallet)
-//       currencyArray.push({
-//         currencyId: currency._id,
-//         currencyName: currency.currencyName,
-//         currencySymbol: currency.currencySymbol,
-//         address: wallet.address,
-//         privateKey: common.encrypt(wallet.privateKey),
-//         amount: 0
-//       });
-//     }
-
-//     const wallet_obj = {
-//       telegramId,
-//       wallets: currencyArray
-//     };
-
-//     await userWalletDB.create(wallet_obj);
-    console.log("Wallet created successfully");
-    return true;
-
-  } catch (error) {
-    console.error("Create Wallet Error:", error);
-    throw error;
-  }
-}
+// createWallets() removed — wallets are now created explicitly by users
+// via bot buttons (create_sol_wallet / create_arb_wallet) or via the mini-app.
+// Both paths write to userPublicWallet, the single source of truth.
 
 
 async function storeTelegramUser(msg, referrerId = null) {
@@ -204,7 +119,6 @@ async function storeTelegramUser(msg, referrerId = null) {
       }
     }
 
-    await createWallets(telegramId);
     return user;
   } catch (error) {
     console.error("Store Telegram User Error:", error);
@@ -752,17 +666,19 @@ async function initializeTelegramBot() {
         );
         return false;
       }
-      const walletDoc = await userWalletDB.findOne({ telegramId });
+      const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       const hasWallet = walletDoc && walletDoc.wallets && walletDoc.wallets.length > 0;
       if (!hasWallet) {
-        const webAppUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/?v=3&telegramId=${telegramId}`;
         bot.sendMessage(chatId,
-          "🔗 *Wallet Required*\n\nYou need to connect a wallet before using this feature.\n\nOpen the app and connect your Phantom or Solflare wallet.",
+          "💼 *No Wallet Found*\n\nCreate a custodial wallet to get started. Your deposit address will be generated instantly — send funds to it and your balance will be credited automatically.",
           {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "🚀 Open Arken & Connect Wallet", web_app: { url: webAppUrl } }],
+                [
+                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+                ],
               ],
             },
           },
@@ -838,15 +754,12 @@ async function initializeTelegramBot() {
         const [activeCount, volumeAgg, walletDoc] = await Promise.all([
           Market.countDocuments({ active: true }),
           Market.aggregate([{ $group: { _id: null, total: { $sum: "$totalVolume" } } }]),
-          userWalletDB.findOne({ telegramId: chatId }),
+          userPublicWalletModel.findOne({ telegramId: chatId }),
         ]);
         activeMarkets = activeCount || 0;
         totalVolume = (volumeAgg && volumeAgg[0] ? volumeAgg[0].total : 0).toFixed(2);
-        if (walletDoc && walletDoc.wallets) {
-          userBalance = walletDoc.wallets
-            .filter(w => w.currencySymbol === "SOL")
-            .reduce((s, w) => s + (w.amount || 0), 0)
-            .toFixed(4);
+        if (walletDoc) {
+          userBalance = Number(walletDoc.balance || 0).toFixed(2);
         }
       } catch (e) {
         console.error("Stats fetch error:", e.message);
@@ -861,7 +774,7 @@ The ultimate prediction layer for the Solana ecosystem.
 
 📊 Live Markets: *${activeMarkets}* Active
 💰 Total Volume: *$${totalVolume}*
-💼 Your Balance: *${userBalance} SOL*
+💼 Your Balance: *$${userBalance}*
 
 What would you like to do?`,
           parse_mode: "Markdown",
@@ -1736,13 +1649,24 @@ if (data.startsWith("search_page_")) {
     if (data === "wallet_deposit") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
-      const walletDoc = await userWalletDB.findOne({ telegramId });
+      const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       if (!walletDoc || !walletDoc.wallets.length) {
-        return bot.sendMessage(chatId, "❌ No wallets found. Use /start to create one.");
+        return bot.sendMessage(chatId,
+          "💼 *No Wallet Found*\n\nCreate a wallet first to get your deposit address.",
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+              ]],
+            },
+          }
+        );
       }
-      let text = "📥 *Deposit Addresses*\n\nSend funds to any of these addresses:\n\n";
+      let text = "📥 *Your Deposit Addresses*\n\nSend funds to your address below. Your balance will be credited automatically.\n\n";
       for (const w of walletDoc.wallets) {
-        text += `*${w.currencySymbol}*\n\`${w.address}\`\n\n`;
+        text += `*${w.network}*\n\`${w.address}\`\n\n`;
       }
       text += "⚠️ Only send the correct token to each address.";
       return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
@@ -1833,26 +1757,27 @@ if (data.startsWith("search_page_")) {
     if (data === "start_deposit") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
-      const walletDoc = await userWalletDB.findOne({ telegramId });
-      const depositUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/deposit?v=3&telegramId=${telegramId}`;
+      const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       if (!walletDoc || !walletDoc.wallets || !walletDoc.wallets.length) {
-        return bot.sendMessage(chatId, "❌ No wallet found. Open the app to create one.", {
-          reply_markup: {
-            inline_keyboard: [[{ text: "📥 Open Deposit", web_app: { url: depositUrl } }]],
-          },
-        });
+        return bot.sendMessage(chatId,
+          "💼 *No Wallet Yet*\n\nCreate a wallet to get your deposit address.",
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+              ]],
+            },
+          }
+        );
       }
-      let text = "📥 *Deposit Addresses*\n\nSend funds to any of these addresses:\n\n";
+      let text = "📥 *Your Deposit Addresses*\n\nSend funds to your address below. Your balance will be credited automatically.\n\n";
       for (const w of walletDoc.wallets) {
-        text += `*${w.currencySymbol}*\n\`${w.address}\`\n\n`;
+        text += `*${w.network}*\n\`${w.address}\`\n\n`;
       }
       text += "⚠️ Only send the correct token to each address.";
-      return bot.sendMessage(chatId, text, {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: [[{ text: "📥 Open Deposit App", web_app: { url: depositUrl } }]],
-        },
-      });
+      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
     }
 
     if (data === "start_portfolio") {
@@ -1881,6 +1806,43 @@ if (data.startsWith("search_page_")) {
         `⚙️ *Settings*\n\nManage your Arken account settings in the app.\n\n• Wallet connections\n• Notification preferences\n• Referral program\n\nUse /wallet to view balances or open the app for full settings.`,
         { parse_mode: "Markdown" }
       );
+    }
+
+    // --- Wallet creation callbacks (bot-side custodial wallet creation) ---
+    if (data === "create_sol_wallet" || data === "create_arb_wallet") {
+      bot.answerCallbackQuery(query.id);
+      const chatId = query.message.chat.id;
+      const network = data === "create_sol_wallet" ? "SOL" : "ARB";
+      try {
+        const result = await creat_new_wallet({ telegramId: String(telegramId), network });
+        if (!result.status) {
+          return bot.sendMessage(chatId, `❌ ${result.message || "Could not create wallet."}`);
+        }
+        const address = result.data?.address;
+        const networkLabel = network === "SOL" ? "Solana (SOL/USDC)" : "Arbitrum (ARB/USDC)";
+        return bot.sendMessage(
+          chatId,
+          `✅ *${networkLabel} Wallet Created*\n\n` +
+          `Your deposit address:\n\`${address}\`\n\n` +
+          `Send USDC or ${network} to this address to fund your account. ` +
+          `Your balance will be credited automatically within minutes.\n\n` +
+          `⚠️ Only send assets on the correct network to this address.`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[
+                { text: "💰 View Wallet", callback_data: "wallet_deposit" },
+                data === "create_sol_wallet"
+                  ? { text: "🔷 Add ARB Wallet", callback_data: "create_arb_wallet" }
+                  : { text: "💎 Add SOL Wallet", callback_data: "create_sol_wallet" },
+              ]],
+            },
+          }
+        );
+      } catch (err) {
+        console.error("create wallet callback error:", err);
+        return bot.sendMessage(chatId, "❌ Wallet creation failed. Please try again.");
+      }
     }
 
   } catch (err) {
@@ -2634,20 +2596,26 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
       const telegramId = msg.from.id;
       try {
         if (!await requireWallet(telegramId, chatId)) return;
-        const userWalletDoc = await userWalletDB.findOne({ telegramId });
+        const userWalletDoc = await userPublicWalletModel.findOne({ telegramId });
         const user = await User.findOne({ telegramId });
 
-        let balanceText = "💰 *Your Wallet Balances*\n\n";
+        const appBalance = Number(userWalletDoc?.balance || 0).toFixed(2);
+        const holdBalance = Number(userWalletDoc?.holdBalance || 0).toFixed(2);
+
+        let balanceText = `💰 *Your Wallet*\n\n`;
+        balanceText += `📊 App Balance: *$${appBalance}*\n`;
+        balanceText += `🔒 On Hold: *$${holdBalance}*\n\n`;
+        balanceText += `*Deposit Addresses:*\n`;
+
         if (userWalletDoc && userWalletDoc.wallets && userWalletDoc.wallets.length) {
           for (const w of userWalletDoc.wallets) {
-            balanceText += `• *${w.currencySymbol}:* ${Number(w.amount).toFixed(4)} _(hold: ${Number(w.holdAmount || 0).toFixed(4)})_\n`;
-            balanceText += `  Address: \`${w.address}\`\n\n`;
+            balanceText += `• *${w.network}:* \`${w.address}\`\n`;
           }
         } else {
-          balanceText += "No wallets found yet.\n";
+          balanceText += "No wallets yet.\n";
         }
 
-        balanceText += `\n💸 Referral earnings: *${Number(user.referralEarnings || 0).toFixed(4)}*`;
+        balanceText += `\n💸 Referral earnings: *$${Number(user?.referralEarnings || 0).toFixed(2)}*`;
 
         bot.sendMessage(chatId, balanceText, {
           parse_mode: "Markdown",
