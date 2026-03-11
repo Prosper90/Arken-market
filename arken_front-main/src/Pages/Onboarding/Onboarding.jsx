@@ -401,6 +401,11 @@ const Onboarding = () => {
           sharedSecret: bs58.decode(parsed.sharedSecret),
           nonce: bs58.decode(parsed.nonce),
         });
+
+        // Set custodial wallets if user has any
+        if (Array.isArray(resp.data.custodialWallets) && resp.data.custodialWallets.length > 0) {
+          setCustodialWallets(resp.data.custodialWallets);
+        }
       } else {
         console.error(resp.message || "Failed to fetch user details");
       }
@@ -2177,11 +2182,23 @@ const Onboarding = () => {
   }, [walletaccess]);
   const [selectNetwork, setSelectNetwork] = useState("");
   const [ChoosewalletStatus, setChoosewalletStatus] = useState(false);
+  const [custodialWallets, setCustodialWallets] = useState([]);
 
   const createNewWallet = async (key) => {
     setwalletName(key);
     localStorage.setItem("walletName", "newwallet");
     setChoosewalletStatus(true);
+  };
+
+  // Reconnects user to their existing custodial wallet(s) without creating a new one
+  const reconnectCustodialWallet = () => {
+    const firstWallet = custodialWallets[0];
+    if (!firstWallet) return;
+    localStorage.setItem("walletName", "newwallet");
+    localStorage.setItem("walletAddress", firstWallet.address);
+    setwalletName("newwallet");
+    setAddress(firstWallet.address);
+    setWalletaccess(true);
   };
 
   const copyPrivateKey = async () => {
@@ -3721,6 +3738,41 @@ const Onboarding = () => {
               {/* {window.Telegram?.WebApp?.initData  ?window.Telegram?.WebApp?.initData :"intidd"}
           {telegramUser?.telegramId  ?telegramUser.telegramId:"telegramUser.telegramId" }
           {teleId?teleId:"teleId"} */}
+              {/* Reconnect to existing custodial wallet — shown when user has a previously created wallet */}
+              {custodialWallets.length > 0 && !walletaccess && (
+                <div style={{ marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8, textAlign: "center" }}>
+                    You have an existing wallet
+                  </p>
+                  {custodialWallets.map((w, i) => (
+                    <div
+                      key={i}
+                      className="obrd_wllet_itm"
+                      style={{ ...pageStyle.obrd_wllet_itm, borderColor: "rgba(99,102,241,0.5)", background: "rgba(99,102,241,0.08)", marginBottom: 8 }}
+                      onClick={reconnectCustodialWallet}
+                    >
+                      <ImageComponent
+                        styles={pageStyle.obrd_wllet_img}
+                        imgPic={walletIMG}
+                        alt="own_wallet"
+                      />
+                      <div className="obrd_wllet_itmcnt">
+                        <h6 style={pageStyle.obrd_wllet_head}>
+                          My {w.network} Wallet
+                        </h6>
+                        <p style={{ ...pageStyle.obrd_wllet_para, fontSize: 11 }}>
+                          {w.address.slice(0, 8)}...{w.address.slice(-6)}
+                        </p>
+                      </div>
+                      <GoArrowRight style={pageStyle.obrd_wllet_icon} />
+                    </div>
+                  ))}
+                  <div style={{ textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 8, marginBottom: 4 }}>
+                    — or connect a different wallet —
+                  </div>
+                </div>
+              )}
+
               <div className="obrd_wllet_wrp" style={pageStyle.obrd_wllet_wrp}>
                 {walletData.map((item, index) => {
                   const isLoading = walletLoading === item.keys; // only true for the clicked wallet

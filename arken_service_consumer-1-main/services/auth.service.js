@@ -3148,6 +3148,12 @@ async function getUserByTelegramIdHandler(data) {
       };
     }
 
+    // Also fetch custodial wallets (userPublicWallet) for this user
+    const custodialDoc = await userPublicWallet.findOne({ telegramId: Number(telegramId) });
+    const custodialWallets = custodialDoc
+      ? custodialDoc.wallets.map((w) => ({ address: w.address, network: w.network }))
+      : [];
+
     return {
       success: true,
       code: 200,
@@ -3160,6 +3166,7 @@ async function getUserByTelegramIdHandler(data) {
           walletName: user.connectedwalletName || null,
           walletAddress: user.connectedwalletAddress || null,
         },
+        custodialWallets,
       },
     };
   } catch (error) {

@@ -1284,7 +1284,13 @@ const handleSolanaDeposit = async () => {
     if (label === "SOL") await depositCurrency();
     else if (label === "USDC") await deposit();
     else showErrorToast("TOKEN deposit coming soon");
+  } else if (walletName === "phantom" && phantomSession?.session && phantomSession?.sharedSecret) {
+    // Phantom connected wallet with valid session — use signTransaction deep link.
+    // This opens Phantom's native signing UI (NOT a WebView), which avoids the blank screen
+    // issue that occurs when Phantom's in-app browser loads the pay-redirect page.
+    await depositCurrency();
   } else {
+    // Phantom without a session, or other wallets — use Solana Pay flow
     await depositViaSolanaPay();
   }
 };
