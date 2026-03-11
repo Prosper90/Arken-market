@@ -16,6 +16,7 @@ import { BrowserProvider, JsonRpcProvider, Contract, parseUnits } from "ethers";
 import Box from "@mui/material/Box";
 import homt_tab_Countimg1 from "../../assets/image/homt_tab_Countimg1.webp";
 import { env } from "../../core/sevice/envconfig";
+import { getSolanaConnectionWithBlockhash, getSolanaConnection } from "../../utils/solanaConnection";
 import * as web3 from "@solana/web3.js";
 import bs58 from "bs58";
 import nacl from "tweetnacl";
@@ -580,11 +581,7 @@ console.log(error,"dsfdsfs")
 
         await wallet.connect();
 
-        const connection = new web3.Connection(
-          env.wallet_endpoint,
-          "confirmed"
-        );
-        const { blockhash } = await connection.getLatestBlockhash();
+        const { connection, blockhash } = await getSolanaConnectionWithBlockhash("confirmed");
 
         const lamports =
           Number(depositAmountref.current) * web3.LAMPORTS_PER_SOL;
@@ -649,12 +646,10 @@ console.log(error,"dsfdsfs")
             return;
           }
 
-          const connection = new web3.Connection(env.wallet_endpoint, "confirmed");
+          const { connection, blockhash } = await getSolanaConnectionWithBlockhash("confirmed");
           const fromPublicKey = new web3.PublicKey(Address);
           const toPublicKey = new web3.PublicKey(env.Admin_wallet);
           const lamports = Number(depositAmountref.current) * web3.LAMPORTS_PER_SOL;
-
-          const { blockhash } = await connection.getLatestBlockhash();
           const transaction = new web3.Transaction({
             recentBlockhash: blockhash,
             feePayer: fromPublicKey,
@@ -743,7 +738,7 @@ console.log(error,"dsfdsfs")
         return;
       }
   
-      const connection = new Connection(env.wallet_endpoint, "confirmed");
+      const connection = await getSolanaConnection("confirmed");
       const mintAddress = new PublicKey(env.usdt_mint_address);
       const senderPublicKey = provider.publicKey;
       const receiverPublicKey = new PublicKey(env.Admin_wallet);

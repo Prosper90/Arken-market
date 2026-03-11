@@ -6,7 +6,9 @@ export const env = {
     // frontUrl: "https://skgcryparb.com/",
 // wallet_endpoint: "https://divine-wild-meme.solana-mainnet.quiknode.pro/5ba906d3420f66396e2be33ed12747873fdb1404/",
 // wallet_endpoint: "https://api.devnet.solana.com",
-wallet_endpoint: import.meta.env.VITE_SOL_RPC_URL || "https://mainnet.helius-rpc.com/?api-key=05031ac5-0873-42a5-bb11-1c124bb119b0", // mainnet
+// NOTE: Deposit.jsx uses getSolanaConnectionWithBlockhash() which auto-rotates through free public RPCs.
+// This fallback is only used by any code that calls new Connection(env.wallet_endpoint) directly.
+wallet_endpoint: import.meta.env.VITE_SOL_RPC_URL || "https://api.mainnet-beta.solana.com", // mainnet public (no rate-limit key)
 // wallet_endpoint: "https://api.testnet.solana.com", // testnet — uncomment for testnet testing
 // usdt_mint_address:"Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", //usdtaddress
 
