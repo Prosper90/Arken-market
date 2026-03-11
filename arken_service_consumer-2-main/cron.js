@@ -860,6 +860,11 @@ cron.schedule("*/60 * * * *", async () => {
   // cron.schedule("*/5 * * * * *", async () => {
   console.log("Fetching Polymarket…", new Date().toLocaleString());
 
+  if (!API_URL) {
+    console.error("❌ POLYMARKET_URL env var is not set — skipping Polymarket sync. Set POLYMARKET_URL=https://gamma-api.polymarket.com in your .env file.");
+    return;
+  }
+
   try {
     await Polymarket.deleteMany({ endDate: { $lt: new Date() } });
     await Polymarket.deleteMany({ closed: true });

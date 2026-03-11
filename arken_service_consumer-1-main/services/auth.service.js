@@ -4583,12 +4583,11 @@ const signatures = await connection.getSignaturesForAddress(
           const postBal = p.uiTokenAmount.uiAmount || 0;
           const diff = postBal - preBal;
 
+          // Only capture incoming deposits (balance increased)
+          // Skip outgoing sweep transactions (diff < 0) to avoid double-crediting
           if (diff > 0) {
             amount = diff;
             to = p.owner;
-          } else if (diff < 0) {
-            amount = Math.abs(diff);
-            from = p.owner;
           }
         });
 
@@ -5727,16 +5726,16 @@ async function processAllWalletDeposits() {
     
     console.log(`📊 Found ${userWallets.length} users`);
     
-    // Prepare bulk operations for better performance
-    const depositInserts = [];
-    const walletUpdates = [];
-let result;
-    
+    let totalNewDeposits = 0;
+    let totalWalletsUpdated = 0;
+
     // Process each user's wallets
     for (const user of userWallets) {
       for (const wallet of user.wallets) {
-        const { address, network, telegramId } = wallet;
-        console.log(`\n🔍 Checking ${network} wallet: ${address}`);
+        const { address, network } = wallet;
+        const telegramId = user.telegramId; // always from parent doc, not sub-doc
+        console.log(`\n🔍 Checking ${network} wallet: ${address} (user: ${telegramId})`);
+
         // Fetch transactions based on network
         let transactions = [];
         if (network === "SOL") {
@@ -5744,135 +5743,81 @@ let result;
         } else if (network === "ETH" || network === "ARB" || network === "EVM") {
           transactions = await getEVMTransactions(address, network);
         }
-        console.log(`   Found ${transactions} transactions`);
-        // Process each transaction
-        // for (const tx of transactions) {
-        //   // Check if already processed (optimized check)
-        //   const isProcessed = await isTransactionProcessed(tx.hash);
-          
-        //   if (isProcessed) {
-        //     console.log(`   ⏭️  Skip: ${tx.hash.substring(0, 10)}... (already processed)`);
-        //     continue;
-        //   }
-        //   const amount = parseFloat(tx.value);
-        //   if (amount <= 0) continue;
-          
-        //   console.log(`   ✅ New deposit: ${amount} ${network} - ${tx.hash.substring(0, 10)}...`);
-          for (const tx of transactions) {
+        console.log(`   Found ${transactions.length} transactions`);
 
-  const isProcessed = await isTransactionProcessed(tx.hash);
-
-  if (isProcessed) {
-    console.log(
-      `   ⏭️ Skip: ${tx.hash.substring(0, 10)}... (already processed)`
-    );
-    continue;
-  }
-
-  const amount = parseFloat(tx.amount|| tx.value);
-
-  if (amount <= 0) continue;
-
-  console.log(
-    `   ✅ New deposit: ${amount} ${tx.symbol} - ${tx.hash.substring(0, 10)}...`
-  );
-          const currency = CURRENCY_CONFIG[network] || CURRENCY_CONFIG.ETH;
-          depositInserts.push({
-            telegramId: user.telegramId,
-            Address: address,
-            walletName: `${network} Wallet`,
-            currencyId: network,
-            currencySymbol: currency.symbol,
-            currencyImage: currency.image,
-            currencyName: currency.name,
-            status: "COMPLETE",
-            Amount: amount,
-            depositAddress: tx.hash || tx.txHash,
-            txHash: tx.hash || tx.txHash,
-            source: "custodial",
-          });
-          console.log(depositInserts,"---- depositInserts-----")
-          // Prepare wallet balance update
-          walletUpdates.push({
-            telegramId: user.telegramId,
-            network: network,
-            address: address,
-            amountToAdd: amount,
-          });
-
-           const get_Fees = await getUserWalletsSimple(user.telegramId, network);
-    console.log(get_Fees,"==================================");
-    const  getPublicwalletaddress = get_Fees.publicNetworkWallet.address
-    const  getPersonalwalletaddress = get_Fees.personalCurrencyWallet.address
-    let estimate  =''
-// if(network=="ARB"){
-//   estimate = await estimateUSDCGasFee_EVM(
-//      network,
-//     getPersonalwalletaddress,
-//     getPublicwalletaddress,
-//     amount,
-//     'USDC'
-//   );
-// }else{
-//    estimate = await estimateGasFee(
-//      network,
-//     getPersonalwalletaddress,
-//     getPublicwalletaddress,
-//     amount,
-//     'USDC'
-//   );
-// }
-    if (depositInserts.length > 0) {
-      console.log(`\n💾 Inserting ${depositInserts.length} new deposits...`);
-      await depositList.insertMany(depositInserts, { ordered: false });
-    }
-
-    if (walletUpdates.length > 0) {
-      console.log(`💰 Updating ${walletUpdates.length} wallet balances...`);
-      for (const update of walletUpdates) {
-        await UserPublicWallet.updateOne(
-          { telegramId: update.telegramId },
-          { $inc: { balance: update.amountToAdd } }
-        );
-      }
-    }
-    //  if (walletUpdates.length > 0) {
-    //   console.log(`💰 Updating ${walletUpdates.length} wallet balances...`);
-    //   for (const update of walletUpdates) {
-    //     await UserWallet.updateOne(
-    //       {
-    //         telegramId: update.telegramId,
-    //         "wallets.currencySymbol": update.network,
-    //       },
-    //       {
-    //         $inc: {
-    //           "wallets.$.amount": update.amountToAdd,
-    //         },
-    //       }
-    //     );
-    //   }
-    // }
-    if (network === 'SOL') {
-      result = await transferUSDC_Solana(user.telegramId, amount);
-    } else if (network === 'ARB' || network === 'EVM') {
-      result = await transferUSDC_EVM(user.telegramId, network, amount);
-    } else {
-      console.warn(`Unsupported network for sweep: ${network} — skipping`);
-    }
-    console.log(result,"--------------------------");
+        // Collect only new (unprocessed) incoming deposits for this wallet
+        const walletNewDeposits = [];
+        for (const tx of transactions) {
+          const isProcessed = await isTransactionProcessed(tx.hash);
+          if (isProcessed) {
+            console.log(`   ⏭️ Skip: ${tx.hash.substring(0, 10)}... (already processed)`);
+            continue;
+          }
+          const amount = parseFloat(tx.amount || tx.value);
+          if (amount <= 0) continue;
+          console.log(`   ✅ New deposit: ${amount} ${tx.symbol || tx.currency || network} - ${tx.hash.substring(0, 10)}...`);
+          walletNewDeposits.push({ tx, amount });
         }
+
+        if (walletNewDeposits.length === 0) continue;
+
+        // Insert deposit records (once per wallet, not per tx)
+        const currency = CURRENCY_CONFIG[network] || CURRENCY_CONFIG.ETH;
+        const depositInserts = walletNewDeposits.map(({ tx, amount }) => ({
+          telegramId,
+          Address: address,
+          walletName: `${network} Wallet`,
+          currencyId: network,
+          currencySymbol: currency.symbol,
+          currencyImage: currency.image,
+          currencyName: currency.name,
+          status: "COMPLETE",
+          Amount: amount,
+          depositAddress: tx.hash || tx.txHash,
+          txHash: tx.hash || tx.txHash,
+          source: "custodial",
+        }));
+
+        try {
+          await depositList.insertMany(depositInserts, { ordered: false });
+          console.log(`\n💾 Inserted ${depositInserts.length} deposits for ${telegramId}`);
+        } catch (insertErr) {
+          // Duplicate key errors are expected on re-runs — ignore them
+          console.log(`Insert note (duplicates OK): ${insertErr.message?.substring(0, 80)}`);
+        }
+
+        // Credit total amount to balance (once per wallet)
+        const totalAmount = walletNewDeposits.reduce((sum, { amount }) => sum + amount, 0);
+        await UserPublicWallet.updateOne(
+          { telegramId },
+          { $inc: { balance: totalAmount } }
+        );
+        console.log(`💰 Credited $${totalAmount} to user ${telegramId}`);
+        totalNewDeposits += walletNewDeposits.length;
+        totalWalletsUpdated++;
+
+        // Sweep funds to admin wallet (once per wallet)
+        let sweepResult;
+        if (network === 'SOL') {
+          sweepResult = await transferUSDC_Solana(telegramId, totalAmount);
+        } else if (network === 'ARB' || network === 'EVM') {
+          sweepResult = await transferUSDC_EVM(telegramId, network, totalAmount);
+        } else {
+          console.warn(`Unsupported network for sweep: ${network} — skipping`);
+        }
+        console.log(sweepResult, "----- sweep result -----");
       }
     }
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
     console.log(`\n✅ Deposit check completed in ${duration}s`);
-    console.log(`📥 New deposits: ${depositInserts.length}`);
-    console.log(`💰 Wallets updated: ${walletUpdates.length}`);
+    console.log(`📥 New deposits: ${totalNewDeposits}`);
+    console.log(`💰 Wallets updated: ${totalWalletsUpdated}`);
 
     return {
       success: true,
-      newDeposits: depositInserts.length,
-      walletsUpdated: walletUpdates.length,
+      newDeposits: totalNewDeposits,
+      walletsUpdated: totalWalletsUpdated,
       duration: duration,
     };
     
