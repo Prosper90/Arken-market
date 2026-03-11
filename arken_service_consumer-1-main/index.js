@@ -2455,8 +2455,8 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [[
-                { text: "🤖 AI Oracle", callback_data: "cm_oracle_ai" },
                 { text: "👤 Manual (Admin)", callback_data: "cm_oracle_manual" },
+                { text: "⛓ UMA Oracle", callback_data: "cm_oracle_uma" },
               ]],
             },
           }
@@ -2485,9 +2485,9 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
         );
       }
 
-      if (data === "cm_oracle_ai" || data === "cm_oracle_manual") {
+      if (data === "cm_oracle_manual" || data === "cm_oracle_uma") {
         if (!state || state.step !== "oracleType") return bot.answerCallbackQuery(query.id);
-        state.data.oracleType = data === "cm_oracle_ai" ? "ai" : "manual";
+        state.data.oracleType = data === "cm_oracle_uma" ? "uma" : "manual";
         marketCreationState.delete(telegramId);
         bot.answerCallbackQuery(query.id);
 
@@ -2506,13 +2506,25 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
             marketStatus: "pending",
             active: false,
             currency: "USDC",
+            chancePercents: (() => {
+              const n = state.data.outcomes.length;
+              const spread = 3;
+              const base = parseFloat((100 / n).toFixed(1));
+              const half = parseFloat((spread / 2).toFixed(1));
+              const p = Array.from({ length: n }, () => base);
+              p[0] = parseFloat((p[0] + half).toFixed(1));
+              p[n - 1] = parseFloat((p[n - 1] - half).toFixed(1));
+              const drift = parseFloat((100 - p.reduce((a, b) => a + b, 0)).toFixed(1));
+              if (drift !== 0) p[n - 1] = parseFloat((p[n - 1] + drift).toFixed(1));
+              return p;
+            })(),
           });
 
           let replyText = `✅ *Market submitted for review!*\n\n` +
             `📝 "${state.data.question}"\n` +
             `🏁 Outcomes: ${state.data.outcomes.join(", ")}\n` +
             `📅 Ends: ${state.data.endDate.toISOString().split("T")[0]}\n` +
-            `🔮 Oracle: ${state.data.oracleType === "ai" ? "AI Auto-resolve" : "Manual"}\n` +
+            `🔮 Oracle: ${state.data.oracleType === "uma" ? "UMA On-chain" : "Manual (Admin)"}\n` +
             `🔒 Visibility: ${state.data.isPrivate ? "Private" : "Public"}\n\n` +
             `Admin will review and activate it shortly.`;
 

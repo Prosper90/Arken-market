@@ -36,7 +36,8 @@
   background: #000000;
   position: absolute;
   width: 100%;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .home_wrp_main::-webkit-scrollbar {

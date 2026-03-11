@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LuBot, LuShieldCheck, LuUser } from 'react-icons/lu';
+import { LuShieldCheck, LuUser } from 'react-icons/lu';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { postMethod } from '../../core/sevice/common.api';
@@ -9,10 +9,19 @@ import './CreateMarket.css';
 
 const PREDEFINED_TAGS = ['Crypto', 'Politics', 'Sports', 'Finance', 'Science', 'Culture', 'Geopolitics', 'Other'];
 
-const equalSplit = (n) => {
-  const base = Math.floor(100 / n);
-  const rem = 100 - base * n;
-  return Array.from({ length: n }, (_, i) => (i === 0 ? base + rem : base));
+// Applies a 3% house spread so markets never open flat 50/50.
+// Binary: [51.5, 48.5]. N>2: first gets +1.5, last gets -1.5, middle equal.
+const spreadSplit = (n, spread = 3) => {
+  if (n < 2) return [100];
+  const base = parseFloat((100 / n).toFixed(1));
+  const half = parseFloat((spread / 2).toFixed(1));
+  const probs = Array.from({ length: n }, () => base);
+  probs[0] = parseFloat((probs[0] + half).toFixed(1));
+  probs[n - 1] = parseFloat((probs[n - 1] - half).toFixed(1));
+  // correct any floating-point drift so total stays exactly 100
+  const drift = parseFloat((100 - probs.reduce((a, b) => a + b, 0)).toFixed(1));
+  if (drift !== 0) probs[n - 1] = parseFloat((probs[n - 1] + drift).toFixed(1));
+  return probs;
 };
 
 // Returns a datetime-local string (YYYY-MM-DDTHH:MM) for a given Date
@@ -35,26 +44,26 @@ const CreateMarket = () => {
   const [outcomes, setOutcomes] = useState(['Yes', 'No']);
   const [endDate, setEndDate] = useState('');
   const [startDate, setStartDate] = useState(toDatetimeLocal(new Date()));
-  const [oracleType, setOracleType] = useState('ai');
+  const [oracleType, setOracleType] = useState('manual');
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(null);
 
   // New fields
   const [tags, setTags] = useState([]);
   const [initialLiquidity, setInitialLiquidity] = useState('');
-  const [probabilities, setProbabilities] = useState([50, 50]);
-  const [rawInputs, setRawInputs] = useState(['50', '50']);
+  const [probabilities, setProbabilities] = useState([51.5, 48.5]);
+  const [rawInputs, setRawInputs] = useState(['51.5', '48.5']);
 
   // Keep probabilities in sync when outcomes count changes
   useEffect(() => {
-    const equal = equalSplit(outcomes.length);
+    const equal = spreadSplit(outcomes.length);
     setProbabilities(equal);
     setRawInputs(equal.map(String));
   }, [outcomes.length]);
 
-  // Reset oracle type when visibility changes
+  // Always default to manual when visibility changes (AI removed)
   useEffect(() => {
-    setOracleType(isPrivate ? 'manual' : 'ai');
+    setOracleType('manual');
   }, [isPrivate]);
 
   // ── Outcomes ──────────────────────────────────────────────────────────────
@@ -394,25 +403,14 @@ const CreateMarket = () => {
         <div className="cm_field">
           <label className="cm_label">Resolution Method</label>
           <div className="cm_oracleWrp">
-            {isPrivate ? (
-              <div
-                className={`cm_oracleCard${oracleType === 'manual' ? ' active' : ''}`}
-                onClick={() => setOracleType('manual')}
-              >
-                <div className="cm_oracleIcon"><LuUser size={24} /></div>
-                <div className="cm_oracleName">Manual</div>
-                <div className="cm_oracleDesc">Admin resolves</div>
-              </div>
-            ) : (
-              <div
-                className={`cm_oracleCard${oracleType === 'ai' ? ' active' : ''}`}
-                onClick={() => setOracleType('ai')}
-              >
-                <div className="cm_oracleIcon"><LuBot size={24} /></div>
-                <div className="cm_oracleName">Olympus AI</div>
-                <div className="cm_oracleDesc">Auto-resolve</div>
-              </div>
-            )}
+            <div
+              className={`cm_oracleCard${oracleType === 'manual' ? ' active' : ''}`}
+              onClick={() => setOracleType('manual')}
+            >
+              <div className="cm_oracleIcon"><LuUser size={24} /></div>
+              <div className="cm_oracleName">Manual</div>
+              <div className="cm_oracleDesc">Admin resolves</div>
+            </div>
             <div
               className={`cm_oracleCard${oracleType === 'uma' ? ' active' : ''}`}
               onClick={() => setOracleType('uma')}

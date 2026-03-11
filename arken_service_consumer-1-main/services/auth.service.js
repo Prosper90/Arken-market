@@ -5988,7 +5988,18 @@ async function createUserMarketHandler(data) {
     );
 
     const outcomeCount = outcomes.length;
-    const defaultProbs = outcomes.map(() => Math.floor(100 / outcomeCount));
+    // Apply 3% house spread — binary starts 51.5/48.5, N-way tilts first outcome up
+    const defaultProbs = (() => {
+      const spread = 3;
+      const base = parseFloat((100 / outcomeCount).toFixed(1));
+      const half = parseFloat((spread / 2).toFixed(1));
+      const p = Array.from({ length: outcomeCount }, () => base);
+      p[0] = parseFloat((p[0] + half).toFixed(1));
+      p[outcomeCount - 1] = parseFloat((p[outcomeCount - 1] - half).toFixed(1));
+      const drift = parseFloat((100 - p.reduce((a, b) => a + b, 0)).toFixed(1));
+      if (drift !== 0) p[outcomeCount - 1] = parseFloat((p[outcomeCount - 1] + drift).toFixed(1));
+      return p;
+    })();
     const market = await Market.create({
       question,
       outcomes,
