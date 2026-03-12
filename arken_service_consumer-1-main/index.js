@@ -170,6 +170,19 @@ function getCategoryIcon(category = "") {
 
 let bot;
 
+// Helper: edit a message whether it has text or media caption.
+async function editMsgAny(chatId, messageId, text, opts) {
+  try {
+    await bot.editMessageText(text, { chat_id: chatId, message_id: messageId, ...opts });
+  } catch (e) {
+    if (e.message && e.message.includes("there is no text")) {
+      await bot.editMessageCaption(text, { chat_id: chatId, message_id: messageId, ...opts });
+    } else if (!e.message || !e.message.includes("message is not modified")) {
+      throw e;
+    }
+  }
+}
+
 // async function initializeTelegramBot() {
 //   try {
 //     console.log("🚀 Initializing Telegram bot (POLLING MODE)...");
@@ -800,24 +813,40 @@ What would you like to do?`,
         const chat = msg.chat;
         const newStatus = msg.new_chat_member.status;
 
-        if (newStatus === "administrator" && chat.type !== "private") {
+        if (chat.type !== "private") {
           const groupId = chat.id;
 
-          const exists = await TelegramGroup.findOne({ groupId });
-          if (!exists) {
-            await TelegramGroup.create({
-              groupId,
-              groupTitle: chat.title,
-              groupOwnerId: msg.from.id,
-              commissionPercent: 5,
-              bettingEnabled: false,
-              botIsAdmin: true,
-            });
+          if (newStatus === "administrator") {
+            const exists = await TelegramGroup.findOne({ groupId });
+            if (!exists) {
+              await TelegramGroup.create({
+                groupId,
+                groupTitle: chat.title,
+                groupOwnerId: msg.from.id,
+                commissionPercent: 5,
+                bettingEnabled: false,
+                botIsAdmin: true,
+              });
+            } else {
+              await TelegramGroup.updateOne({ groupId }, { $set: { botIsAdmin: true } });
+            }
 
             bot.sendMessage(
               groupId,
-              "✅ Bot activated!\nAdmin can enable betting using /enablebets"
+              "✅ *Arken Bot Activated!*\n\n" +
+              "I'm now set up in this group. Here's how to get started:\n\n" +
+              "1️⃣ The group owner sends /enablebets to activate prediction markets\n" +
+              "2️⃣ Members can then use /trending and /bets to view markets\n\n" +
+              "💡 Personal commands (/wallet, /deposit, /withdraw) work via DM.",
+              { parse_mode: "Markdown" }
             );
+          } else if (newStatus === "member") {
+            // Bot was added as regular member (not admin)
+            bot.sendMessage(
+              groupId,
+              "👋 *Arken Bot joined!*\n\nTo use prediction markets in this group, please make me an *admin* first, then the owner can run /enablebets.",
+              { parse_mode: "Markdown" }
+            ).catch(() => {});
           }
         }
       } catch (err) {
@@ -829,16 +858,26 @@ What would you like to do?`,
       const groupId = msg.chat.id;
       const userId = msg.from.id;
 
+      if (msg.chat.type === "private") {
+        return bot.sendMessage(groupId, "ℹ️ /enablebets is for group chats. Add me as admin to a group and use this command there.");
+      }
+
       const group = await TelegramGroup.findOne({ groupId });
-      if (!group) return;
+      if (!group) {
+        return bot.sendMessage(groupId, "⚠️ Bot is not set up as admin in this group yet. Please make me an admin first, then try again.");
+      }
 
       if (group.groupOwnerId !== userId) {
-        return bot.sendMessage(groupId, "❌ Only group owner can enable betting");
+        return bot.sendMessage(groupId, "❌ Only the group owner can enable betting.");
+      }
+
+      if (group.bettingEnabled) {
+        return bot.sendMessage(groupId, "✅ Betting is already enabled in this group!");
       }
 
       group.bettingEnabled = true;
       await group.save();
-      bot.sendMessage(groupId, "🎯 Betting enabled in this group!");
+      bot.sendMessage(groupId, "🎯 Betting is now enabled! Users can use /trending and /bets to find markets.");
     });
 
     bot.onText(/\/bets/, async (msg) => {
@@ -868,17 +907,24 @@ What would you like to do?`,
       const chatId = msg.chat.id;
       const telegramId = msg.from.id;
       const depositUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/deposit?v=3&telegramId=${telegramId}`;
-      const walletDoc = await userWalletDB.findOne({ telegramId });
+      const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       if (!walletDoc || !walletDoc.wallets || !walletDoc.wallets.length) {
-        return bot.sendMessage(chatId, "❌ No wallet found. Open the app to create one.", {
+        return bot.sendMessage(chatId, "💼 *No Wallet Yet*\n\nCreate a custodial wallet to get your deposit address.\nYour balance will be credited automatically once funds arrive.", {
+          parse_mode: "Markdown",
           reply_markup: {
-            inline_keyboard: [[{ text: "📥 Open Deposit", web_app: { url: depositUrl } }]],
+            inline_keyboard: [
+              [
+                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+              ],
+              [{ text: "📥 Open Deposit App", web_app: { url: depositUrl } }],
+            ],
           },
         });
       }
-      let text = "📥 *Deposit Addresses*\n\nSend funds to any of these addresses:\n\n";
+      let text = "📥 *Your Deposit Addresses*\n\nSend funds to your address below:\n\n";
       for (const w of walletDoc.wallets) {
-        text += `*${w.currencySymbol}*\n\`${w.address}\`\n\n`;
+        text += `*${w.network}*\n\`${w.address}\`\n\n`;
       }
       text += "⚠️ Only send the correct token to each address.";
       bot.sendMessage(chatId, text, {
@@ -1091,7 +1137,10 @@ bot.on("callback_query", async (query) => {
       }).limit(10).lean();
 
       if (!markets.length) {
-        return bot.sendMessage(groupId, "📭 No markets found in this category.");
+        return bot.editMessageText("📭 No markets found in this category.", {
+          chat_id: groupId,
+          message_id: query.message.message_id,
+        }).catch(() => bot.sendMessage(groupId, "📭 No markets found in this category."));
       }
 
       const webAppBase = process.env.MINI_APP_URL || "https://arken.blfdemo.online";
@@ -1109,10 +1158,15 @@ bot.on("callback_query", async (query) => {
         rows.push(row);
       }
 
-      return bot.sendMessage(groupId, "📊 *Active Markets* — tap to open:", {
+      return bot.editMessageText("📊 *Active Markets* — tap to open:", {
+        chat_id: groupId,
+        message_id: query.message.message_id,
         parse_mode: "Markdown",
         reply_markup: { inline_keyboard: rows },
-      });
+      }).catch(() => bot.sendMessage(groupId, "📊 *Active Markets* — tap to open:", {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: rows },
+      }));
     }
 
     if (data.startsWith("trending_page_")) {
@@ -1649,17 +1703,23 @@ if (data.startsWith("search_page_")) {
     if (data === "wallet_deposit") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       if (!walletDoc || !walletDoc.wallets.length) {
-        return bot.sendMessage(chatId,
+        return bot.editMessageText(
           "💼 *No Wallet Found*\n\nCreate a wallet first to get your deposit address.",
           {
+            chat_id: chatId,
+            message_id: msgId,
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[
-                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
-              ]],
+              inline_keyboard: [
+                [
+                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+                ],
+                [{ text: "← Back", callback_data: "back_to_wallet" }],
+              ],
             },
           }
         );
@@ -1669,87 +1729,129 @@ if (data.startsWith("search_page_")) {
         text += `*${w.network}*\n\`${w.address}\`\n\n`;
       }
       text += "⚠️ Only send the correct token to each address.";
-      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+      return bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_wallet" }]] },
+      });
     }
 
     if (data === "wallet_withdraw") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
-      return bot.sendMessage(
-        chatId,
+      const msgId = query.message.message_id;
+      return bot.editMessageText(
         "📤 *Withdraw*\n\nTo withdraw, use the app:\n\n" +
         `🔗 [Open App](${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/?v=3&telegramId=${telegramId})`,
-        { parse_mode: "Markdown" }
+        {
+          chat_id: chatId,
+          message_id: msgId,
+          parse_mode: "Markdown",
+          reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_wallet" }]] },
+        }
       );
     }
 
     if (data === "wallet_referrals") {
       bot.answerCallbackQuery(query.id);
-      // Trigger the referrals command inline
       const Referral = require("./models/referral");
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const referrals = await Referral.find({ referrerId: telegramId });
       const totalEarned = referrals.reduce((sum, r) => sum + r.totalEarned, 0);
       const me = await bot.getMe();
       const referralLink = `https://t.me/${me.username}?start=ref_${telegramId}`;
-      return bot.sendMessage(
-        chatId,
+      return bot.editMessageText(
         `👥 *Referral Dashboard*\n\nReferred users: *${referrals.length}*\nTotal earned: *${totalEarned.toFixed(4)}*\n\n🔗 Your link:\n\`${referralLink}\``,
-        { parse_mode: "Markdown" }
+        {
+          chat_id: chatId,
+          message_id: msgId,
+          parse_mode: "Markdown",
+          reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_wallet" }]] },
+        }
       );
     }
 
     if (data === "wallet_history") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const Prediction = require("./models/predictions");
       const bets = await Prediction.find({ telegramId }).sort({ createdAt: -1 }).limit(10).lean();
-      if (!bets.length) return bot.sendMessage(chatId, "📋 No bets placed yet.");
+      const backRow = [{ text: "← Back", callback_data: "back_to_wallet" }];
+      if (!bets.length) {
+        return bot.editMessageText("📋 No bets placed yet.", {
+          chat_id: chatId,
+          message_id: msgId,
+          reply_markup: { inline_keyboard: [backRow] },
+        });
+      }
       let text = "📋 *Last 10 Bets*\n\n";
       for (const b of bets) {
         const emoji = b.status === "WON" ? "✅" : b.status === "LOST" ? "❌" : "⏳";
         text += `${emoji} *${b.outcomeLabel}* — ${b.amount} ${b.currency || ""} | ${b.status}\n`;
       }
-      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+      return bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [backRow] },
+      });
     }
 
     if (data === "wallet_mymarkets") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const userMarkets = await Market.find({ creatorTelegramId: String(telegramId) })
         .sort({ createdAt: -1 })
         .limit(10)
         .lean();
-      if (!userMarkets.length) return bot.sendMessage(chatId, "📊 You haven't created any markets yet.");
+      const backRow = [{ text: "← Back", callback_data: "back_to_wallet" }];
+      if (!userMarkets.length) {
+        return bot.editMessageText("📊 You haven't created any markets yet.", {
+          chat_id: chatId,
+          message_id: msgId,
+          reply_markup: { inline_keyboard: [backRow] },
+        });
+      }
       let text = "📊 *My Markets*\n\n";
       for (const m of userMarkets) {
         const statusEmoji = m.marketStatus === "active" ? "🟢" : m.marketStatus === "resolved" ? "✅" : "⏳";
         const end = m.endDate ? new Date(m.endDate).toLocaleDateString() : "—";
         text += `${statusEmoji} *${m.question}*\nStatus: ${m.marketStatus || "pending"} | Ends: ${end}\n\n`;
       }
-      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+      return bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [backRow] },
+      });
     }
 
     // --- /start button callbacks ---
     if (data === "start_markets") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const topMarkets = await Market.find({ active: true, endDate: { $gte: new Date() } })
         .sort({ totalVolume: -1 })
         .limit(3)
         .lean();
       const webAppUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/?v=3&telegramId=${telegramId}`;
-      if (!topMarkets.length) {
-        return bot.sendMessage(chatId, "📭 No active markets right now. Check back soon!");
-      }
-      let text = "📊 *Top Active Markets*\n\n";
-      topMarkets.forEach((m, i) => {
-        text += `${i + 1}. *${m.question}*\n   Volume: $${(m.totalVolume || 0).toFixed(2)}\n\n`;
-      });
-      return bot.sendMessage(chatId, text, {
+      let text = topMarkets.length
+        ? "📊 *Top Active Markets*\n\n" + topMarkets.map((m, i) =>
+            `${i + 1}. *${m.question}*\n   Volume: $${(m.totalVolume || 0).toFixed(2)}`
+          ).join("\n\n")
+        : "📭 No active markets right now. Check back soon!";
+      return editMsgAny(chatId, msgId, text, {
         parse_mode: "Markdown",
         reply_markup: {
-          inline_keyboard: [[{ text: "🚀 Open Trading App", web_app: { url: webAppUrl } }]],
+          inline_keyboard: [
+            [{ text: "🚀 Open Trading App", web_app: { url: webAppUrl } }],
+            [{ text: "← Back", callback_data: "back_to_start" }],
+          ],
         },
       });
     }
@@ -1757,17 +1859,21 @@ if (data.startsWith("search_page_")) {
     if (data === "start_deposit") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const walletDoc = await userPublicWalletModel.findOne({ telegramId });
       if (!walletDoc || !walletDoc.wallets || !walletDoc.wallets.length) {
-        return bot.sendMessage(chatId,
-          "💼 *No Wallet Yet*\n\nCreate a wallet to get your deposit address.",
+        return editMsgAny(chatId, msgId,
+          "💼 *No Wallet Yet*\n\nCreate a custodial wallet to get your deposit address.",
           {
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[
-                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
-              ]],
+              inline_keyboard: [
+                [
+                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
+                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+                ],
+                [{ text: "← Back", callback_data: "back_to_start" }],
+              ],
             },
           }
         );
@@ -1777,34 +1883,47 @@ if (data.startsWith("search_page_")) {
         text += `*${w.network}*\n\`${w.address}\`\n\n`;
       }
       text += "⚠️ Only send the correct token to each address.";
-      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+      return editMsgAny(chatId, msgId, text, {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_start" }]] },
+      });
     }
 
     if (data === "start_portfolio") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const Prediction = require("./models/predictions");
       const activeBets = await Prediction.find({ telegramId, status: "OPEN" })
         .sort({ createdAt: -1 })
         .limit(5)
         .lean();
+      const backRow = [{ text: "← Back", callback_data: "back_to_start" }];
       if (!activeBets.length) {
-        return bot.sendMessage(chatId, "💼 You have no active bets. Open the app to start predicting!");
+        return editMsgAny(chatId, msgId, "💼 You have no active bets. Open the app to start predicting!", {
+          reply_markup: { inline_keyboard: [backRow] },
+        });
       }
       let text = "💼 *Your Active Bets*\n\n";
       for (const b of activeBets) {
         text += `⏳ *${b.outcomeLabel || "Unknown"}*\n   ${b.amount} ${b.currency || ""} · potential: ${(b.potentialPayout || 0).toFixed(4)}\n\n`;
       }
-      return bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+      return editMsgAny(chatId, msgId, text, {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [backRow] },
+      });
     }
 
     if (data === "start_settings") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
-      return bot.sendMessage(
-        chatId,
+      const msgId = query.message.message_id;
+      return editMsgAny(chatId, msgId,
         `⚙️ *Settings*\n\nManage your Arken account settings in the app.\n\n• Wallet connections\n• Notification preferences\n• Referral program\n\nUse /wallet to view balances or open the app for full settings.`,
-        { parse_mode: "Markdown" }
+        {
+          parse_mode: "Markdown",
+          reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_start" }]] },
+        }
       );
     }
 
@@ -1812,16 +1931,18 @@ if (data.startsWith("search_page_")) {
     if (data === "create_sol_wallet" || data === "create_arb_wallet") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
       const network = data === "create_sol_wallet" ? "SOL" : "ARB";
       try {
         const result = await creat_new_wallet({ telegramId: String(telegramId), network });
         if (!result.status) {
-          return bot.sendMessage(chatId, `❌ ${result.message || "Could not create wallet."}`);
+          return editMsgAny(chatId, msgId, `❌ ${result.message || "Could not create wallet."}`, {
+            reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_start" }]] },
+          });
         }
         const address = result.data?.address;
         const networkLabel = network === "SOL" ? "Solana (SOL/USDC)" : "Arbitrum (ARB/USDC)";
-        return bot.sendMessage(
-          chatId,
+        return editMsgAny(chatId, msgId,
           `✅ *${networkLabel} Wallet Created*\n\n` +
           `Your deposit address:\n\`${address}\`\n\n` +
           `Send USDC or ${network} to this address to fund your account. ` +
@@ -1830,19 +1951,99 @@ if (data.startsWith("search_page_")) {
           {
             parse_mode: "Markdown",
             reply_markup: {
-              inline_keyboard: [[
-                { text: "💰 View Wallet", callback_data: "wallet_deposit" },
-                data === "create_sol_wallet"
-                  ? { text: "🔷 Add ARB Wallet", callback_data: "create_arb_wallet" }
-                  : { text: "💎 Add SOL Wallet", callback_data: "create_sol_wallet" },
-              ]],
+              inline_keyboard: [
+                [
+                  { text: "💰 View Wallet", callback_data: "wallet_deposit" },
+                  data === "create_sol_wallet"
+                    ? { text: "🔷 Add ARB Wallet", callback_data: "create_arb_wallet" }
+                    : { text: "💎 Add SOL Wallet", callback_data: "create_sol_wallet" },
+                ],
+                [{ text: "← Back to Main", callback_data: "back_to_start" }],
+              ],
             },
           }
         );
       } catch (err) {
         console.error("create wallet callback error:", err);
-        return bot.sendMessage(chatId, "❌ Wallet creation failed. Please try again.");
+        return editMsgAny(chatId, msgId, "❌ Wallet creation failed. Please try again.", {
+          reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_start" }]] },
+        });
       }
+    }
+
+    // --- back_to_start: restore the /start welcome photo caption ---
+    if (data === "back_to_start") {
+      bot.answerCallbackQuery(query.id);
+      const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
+      const webAppUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/?v=3&telegramId=${telegramId}`;
+      let activeMarkets = 0, totalVolume = 0, userBalance = 0;
+      try {
+        const [activeCount, volumeAgg, walletDoc] = await Promise.all([
+          Market.countDocuments({ active: true }),
+          Market.aggregate([{ $group: { _id: null, total: { $sum: "$totalVolume" } } }]),
+          userPublicWalletModel.findOne({ telegramId }),
+        ]);
+        activeMarkets = activeCount || 0;
+        totalVolume = (volumeAgg && volumeAgg[0] ? volumeAgg[0].total : 0).toFixed(2);
+        if (walletDoc) userBalance = Number(walletDoc.balance || 0).toFixed(2);
+      } catch (e) {}
+      return editMsgAny(chatId, msgId,
+        `🚀 *Welcome to Arken Prediction Markets*\nThe ultimate prediction layer for the Solana ecosystem.\n\n📊 Live Markets: *${activeMarkets}* Active\n💰 Total Volume: *$${totalVolume}*\n💼 Your Balance: *$${userBalance}*\n\nWhat would you like to do?`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🚀 Open Trading App", web_app: { url: webAppUrl } }],
+              [
+                { text: "📊 Active Markets", callback_data: "start_markets" },
+                { text: "📥 Deposit", callback_data: "start_deposit" },
+              ],
+              [
+                { text: "💼 Portfolio", callback_data: "start_portfolio" },
+                { text: "⚙️ Settings", callback_data: "start_settings" },
+              ],
+            ],
+          },
+        }
+      );
+    }
+
+    // --- back_to_wallet: restore the /wallet balance message ---
+    if (data === "back_to_wallet") {
+      bot.answerCallbackQuery(query.id);
+      const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
+      const userWalletDoc = await userPublicWalletModel.findOne({ telegramId });
+      const userObj = await User.findOne({ telegramId });
+      const appBalance = Number(userWalletDoc?.balance || 0).toFixed(2);
+      const holdBalance = Number(userWalletDoc?.holdBalance || 0).toFixed(2);
+      let balanceText = `💰 *Your Wallet*\n\n📊 App Balance: *$${appBalance}*\n🔒 On Hold: *$${holdBalance}*\n\n*Deposit Addresses:*\n`;
+      if (userWalletDoc && userWalletDoc.wallets && userWalletDoc.wallets.length) {
+        for (const w of userWalletDoc.wallets) {
+          balanceText += `• *${w.network}:* \`${w.address}\`\n`;
+        }
+      } else {
+        balanceText += "No wallets yet.\n";
+      }
+      balanceText += `\n💸 Referral earnings: *$${Number(userObj?.referralEarnings || 0).toFixed(2)}*`;
+      return bot.editMessageText(balanceText, {
+        chat_id: chatId,
+        message_id: msgId,
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "📥 Deposit", callback_data: "wallet_deposit" },
+              { text: "📤 Withdraw", callback_data: "wallet_withdraw" },
+            ],
+            [
+              { text: "👥 My Referrals", callback_data: "wallet_referrals" },
+              { text: "📋 Bet History", callback_data: "wallet_history" },
+            ],
+          ],
+        },
+      });
     }
 
   } catch (err) {

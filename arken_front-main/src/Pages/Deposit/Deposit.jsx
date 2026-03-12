@@ -61,8 +61,8 @@ const currencies = [
   { value: "BTC - Bitcoin", label: "BTC - Bitcoin" },
   { value: "USDT - Tether", label: "USDT - Tether" },
 ];
-const SOLANA_RPC =
-  "https://mainnet.helius-rpc.com/?api-key=05031ac5-0873-42a5-bb11-1c124bb119b0";
+// SOLANA_RPC is kept as a fallback constant; active code uses getSolanaConnection() instead
+const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 const Deposit = () => {
   const [searchParams] = useSearchParams();
   const { telegramUser } = useTelegramUser();
@@ -92,6 +92,7 @@ const Deposit = () => {
   };
   const [addressError,setAddressError]=useState('')
   const [withdrawAddress,setWithdrawAddress]=useState('')
+  const [withdrawTxId, setWithdrawTxId] = useState('')
   const detectNetwork = (address) => {
   if (address.startsWith("0x")) return "evm";
   if (address.length >= 32 && address.length <= 44) return "solana";
@@ -140,7 +141,6 @@ const handleWithdrawAddress = (e) => {
   const [currencyList, setCurrencyList] = useState([
     { value: "sol", label: "SOL", key: "sol", depositLimit: 0 },
     { value: "usdc", label: "USDC", key: "usdc", depositLimit: 0 },
-    { value: "token", label: "TOKEN", key: "token", depositLimit: 0 },
   ]);
 
   const getCurrenyList = async () => {
@@ -154,9 +154,12 @@ const handleWithdrawAddress = (e) => {
 for (let i = 0; i < resp.data.length; i++) {
   const opt = resp.data[i];
 
+  // Always skip TOKEN option
+  if (opt.currencySymbol === "TOKEN") continue;
+
   if (
     walletName === "metamask" &&
-    ["USDT", "SOL", "TOKEN"].includes(opt.currencySymbol)
+    ["USDT", "SOL"].includes(opt.currencySymbol)
   ) {
     continue;
   }
@@ -373,6 +376,7 @@ if (!withdrawAddress) {
   }
 
     setwithdrawLoader(true);
+    setWithdrawTxId('');
     var obj = {
       currency: selectedCurrencyLabel,
       Amount: amount,
@@ -389,6 +393,9 @@ if (!withdrawAddress) {
     setwithdrawLoader(false);
     if (resp.success) {
       showSuccessToast(resp.Message);
+      if (resp.txHash || resp.txId || resp.transactionHash) {
+        setWithdrawTxId(resp.txHash || resp.txId || resp.transactionHash);
+      }
     } else {
       showErrorToast(resp.Message);
     } 
@@ -1198,7 +1205,7 @@ const depositViaSolanaPay = async () => {
   // Poll blockchain for the tx that contains our reference key.
   // No heavy RPC calls — just getSignaturesForAddress (lightweight).
   try {
-    const connection = new Connection(SOLANA_RPC);
+    const connection = await getSolanaConnection("confirmed");
     const refPk = new web3.PublicKey(refPubkey);
 
     const txSignature = await new Promise((resolve, reject) => {
@@ -1279,13 +1286,8 @@ const handleSolanaDeposit = async () => {
     if (label === "SOL") await depositCurrency();
     else if (label === "USDC") await deposit();
     else showErrorToast("TOKEN deposit coming soon");
-  } else if (walletName === "phantom" && phantomSession?.session && phantomSession?.sharedSecret) {
-    // Phantom connected wallet with valid session — use signTransaction deep link.
-    // This opens Phantom's native signing UI (NOT a WebView), which avoids the blank screen
-    // issue that occurs when Phantom's in-app browser loads the pay-redirect page.
-    await depositCurrency();
   } else {
-    // Phantom without a session, or other wallets — use Solana Pay flow
+    // Phantom and all other wallets: open Chrome → user approves in Phantom → returns to app
     await depositViaSolanaPay();
   }
 };
@@ -1316,7 +1318,7 @@ const sendusdcfn = async () => {
 async function sendUSDC({ fromPublicKey, toAddress, amount, phantomSession, d_key_secret,d_key_public }) {
   try {
     const USDC_MINT = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
-    const connection = new Connection(SOLANA_RPC);
+    const connection = await getSolanaConnection("confirmed");
 
     const from = new PublicKey(fromPublicKey);
     const to = new PublicKey(toAddress);
@@ -1868,6 +1870,16 @@ const getTransaction = async () => {
                           </div>
                         </div>
                       </div>
+  {localStorage.getItem('walletName') === 'newwallet' && (
+    <div style={{ marginTop: "16px", background: "rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px 16px" }}>
+      <p style={{ color: "#facc15", fontWeight: 700, fontSize: "13px", margin: "0 0 8px" }}>
+        📋 How to deposit
+      </p>
+      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0 0 4px" }}>1. Copy your wallet address above</p>
+      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0 0 4px" }}>2. Send SOL or USDC to that address from your external wallet</p>
+      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0" }}>3. Your balance will be credited automatically within 5–10 minutes ✅</p>
+    </div>
+  )}
   {localStorage.getItem('walletName')== 'newwallet'?""
   :
                       depositLoader == true ? (
@@ -2098,20 +2110,49 @@ const getTransaction = async () => {
                             </span>
                           </div> */}
 
-                           <div className="amount-display">
-                             {/* <div
-                            className="amount-container"
-                            style={pageStyle.amountcontainer}
-                          > */}
-                            <input
-  type="text"
+                           <div style={{ position: "relative", width: "100%" }}>
+                            <textarea
+  rows={3}
   value={withdrawAddress}
   onChange={handleWithdrawAddress}
-  // placeholder="Enter withdraw address"
+  placeholder="Enter withdraw address"
   className="wallet-address wallet-text"
-  style={pageStyle.addesssInput}
+  style={{
+    ...pageStyle.addesssInput,
+    width: "100%",
+    minHeight: "72px",
+    resize: "none",
+    paddingRight: "72px",
+    fontSize: "13px",
+    lineHeight: "1.5",
+    wordBreak: "break-all",
+  }}
 />
-{/* </div>   */}
+<button
+  type="button"
+  onClick={async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      setWithdrawAddress(text.trim());
+      setAddressError('');
+    } catch {}
+  }}
+  style={{
+    position: "absolute",
+    top: "8px",
+    right: "8px",
+    background: "rgba(255,255,255,0.15)",
+    border: "1px solid rgba(255,255,255,0.25)",
+    borderRadius: "6px",
+    color: "#fff",
+    fontSize: "12px",
+    padding: "4px 10px",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+  }}
+>
+  Paste
+</button>
                               <div
                                 className="error-text"
                                 style={pageStyle.amountplaceholder}
@@ -2161,6 +2202,27 @@ const getTransaction = async () => {
                         >
                           Withdraw
                         </button>
+                      )}
+
+                      {/* Withdrawal TXN confirmation */}
+                      {withdrawTxId && (
+                        <div style={{ marginTop: "16px", background: "rgba(255,255,255,0.07)", borderRadius: "10px", padding: "12px 14px" }}>
+                          <p style={{ color: "#4ade80", fontWeight: 700, fontSize: "13px", margin: "0 0 6px" }}>
+                            ✅ Withdrawal Submitted
+                          </p>
+                          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "11px", margin: "0 0 4px" }}>
+                            Transaction Hash:
+                          </p>
+                          <span
+                            style={{ color: "#fff", fontSize: "11px", wordBreak: "break-all", cursor: "pointer" }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(withdrawTxId).catch(() => {});
+                              showSuccessToast("Copied!");
+                            }}
+                          >
+                            {withdrawTxId}
+                          </span>
+                        </div>
                       )}
 
                       {/* Withdraw History */}
