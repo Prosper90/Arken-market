@@ -217,7 +217,7 @@ const { setMarkets,markets } = useMarkets();
 const cursorRef = useRef(null);
 const [isSearching, setIsSearching] = useState(false);
 
-const [category, setCategory] = useState("All"); 
+const [category, setCategory] = useState("All");
 
 const loaderRef2 = useRef(null);
 
@@ -269,6 +269,15 @@ useEffect(() => {
 
   const {telegramUser } = useTelegramUser();
 
+  // Fire-and-forget deposit sweep on every app entry
+  useEffect(() => {
+    const telegramId = telegramUser?.telegramId || localStorage.getItem("telegramId");
+    if (!telegramId) return;
+    postMethod({ apiUrl: apiService.sweepDeposits, payload: { telegramId } })
+      .then(r => { if (r.newDeposits > 0) console.log(`[sweep] credited ${r.newDeposits} new deposit(s)`); })
+      .catch(() => {}); // silent — never block the UI
+  }, [telegramUser?.telegramId]);
+
 const fetchTotalWinnings = async () => {
   try {
 
@@ -315,7 +324,7 @@ const onTabChange = (tab, item) => {
   setHasMore(true);
 
   setHomeTabContent((prev) => {
-    if (tab === "Manual" || tab === "All" || tab === "Crypto") {
+    if (tab === "Arken" || tab === "All" || tab === "Crypto") {
       setTabActive(
         defaultHomeTabContent.find(t => t.tabTitle === tab)?.id || 1
       );
@@ -323,7 +332,7 @@ const onTabChange = (tab, item) => {
       return defaultHomeTabContent;
     }
 
-    let updated = prev.filter(t => t.tabTitle !== "Manual");
+    let updated = prev.filter(t => t.tabTitle !== "Arken");
     let existingTab = updated.find(t => t.tabTitle === tab);
 
     if (!existingTab) {
@@ -364,12 +373,12 @@ const onTabChange = (tab, item) => {
     
 useEffect(() => {
   getMarketsStats(false);
-  
 }, []);
+
 useEffect(() => {
   fetchTotalWinnings();
-  
 }, []);
+
 
 useEffect(() => {
   if (!loaderRef2.current) return;
@@ -403,7 +412,8 @@ const getMarketsStats = async (isLoadMore = false, selectedCategory = category,s
       payload: {
         limit: 10,
         cursor: isLoadMore ? cursorRef.current : null,
-        category: selectedCategory === "All" ? null : selectedCategory,
+        category: (selectedCategory === "All" || selectedCategory === "Arken") ? null : selectedCategory,
+        source: selectedCategory === "Arken" ? "arken" : null,
         subcategory: selectedSubcategory === "All" ? null : selectedSubcategory,
         search: searchText || null,
         telegramId: telegramUser?.telegramId || null,
@@ -825,9 +835,9 @@ useEffect(() => {
           <div className='skeleton skeleton-button'></div>
         </div>
       ))
-    ) : stats?.length > 0 ? (
-
-      stats.filter(item => item.marketStatus !== 'pending').map((item, index) => {
+    ) : (stats?.length > 0) ? (() => {
+      const mergedList = (stats || []).filter(item => item.marketStatus !== "pending");
+      return mergedList.map((item, index) => {
         const percentage = item.chancePercents?.[0] || 0;
         const statusLabel = item.marketStatus
           ? item.marketStatus.charAt(0).toUpperCase() + item.marketStatus.slice(1)
@@ -922,9 +932,8 @@ useEffect(() => {
             </button>
           </div>
         );
-      })
-
-    ) : (
+      });
+    })() : (
       <div className='cmmn_tbl_noData'>
          <ImageComponent
                 imgPic={nodatafound}

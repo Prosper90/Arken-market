@@ -65,6 +65,9 @@ const queueNamelist = {
   disputeMarket: "disputeMarket",
   getUserMarkets: "getUserMarkets",
   getUserWithdrawList: "getUserWithdrawList",
+  addMarketLiquidity: "addMarketLiquidity",
+  sweepUserDeposits: "sweepUserDeposits",
+  sellPosition: "sellPosition",
 
 };
 

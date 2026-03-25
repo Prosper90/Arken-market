@@ -222,6 +222,14 @@
   background: rgba(255, 141, 40, 30%);
   color: #ff8d28;
 }
+.prfl_tab_itmBdg.actv_Bdg {
+  background: rgba(72, 199, 116, 20%);
+  color: #48c774;
+}
+.prfl_tab_itmBdg.cmplt_Bdg {
+  background: rgba(100, 149, 237, 20%);
+  color: #6495ed;
+}
 
 .prfl_tab_itmBdg.pendg_No {
   background: #34c75930;

@@ -25,6 +25,7 @@ const SellForm = ({ handleBotClose,market,selectedOutcome }) => {
   const [loading, setLoading] = useState(false);
   const [amountError, setAmountError] = useState("");
 
+
   useEffect(() => {
     if (!betAmount || !selectedOutcome?.price) {
       setPotentialWin(0);
@@ -86,12 +87,18 @@ const SellForm = ({ handleBotClose,market,selectedOutcome }) => {
       marketId: market.specifyId ? market.specifyId : null,
       manualId: market.specifyId ? null : market._id,
       conditionId: market.conditionId ? market.conditionId : null,
-      outcomeIndex: market.outcomes.indexOf(selectedOutcome.outcome),
+      outcomeIndex: market.outcomes ? market.outcomes.indexOf(selectedOutcome.outcome) : 0,
       outcomeLabel: selectedOutcome.outcome,
       amount: Number(betAmount),
-      odds: Number(currentMarketPrice),
-      currency: "USDC",
+      odds: Number(currentMarketPrice) || Number(selectedOutcome?.price) || 0.5,
+      currency: market?.source === "arken" ? "USDT" : "USDC",
       source: market.source || "manual",
+      ...(market?.source === "arken" && {
+        arkenMarketAddress: market.arkenMarketAddress,
+      }),
+      ...(market?.source === "solana" && {
+        solanaMarketId: market.solanaMarketId || market._id,
+      }),
     };
 
     try {
@@ -101,11 +108,15 @@ const SellForm = ({ handleBotClose,market,selectedOutcome }) => {
         payload,
       });
       if (resp.success) {
-        if (token && window.Telegram?.WebApp) {
-          toast.success("Bet placed successfully. You may now close this window.");
-          window.Telegram.WebApp.close();
+        const txHash = resp.data?.evmTxHash || resp.data?.rainTxHash;
+        if (txHash) {
+          toast.success("Bet placed on-chain!");
         } else {
           toast.success("Your bet has been successfully placed");
+        }
+        if (token && window.Telegram?.WebApp) {
+          setTimeout(() => window.Telegram.WebApp.close(), 1500);
+        } else {
           navigate('/profile');
         }
       } else {
@@ -207,16 +218,16 @@ const SellForm = ({ handleBotClose,market,selectedOutcome }) => {
               Platform Fee (3%)
             </h6>
             <h5 className="potencial_win_value" style={{ ...pageStyle.potencial_win_value, color: "#e05c5c" }}>
-              ${betAmount ? (Number(betAmount) * 0.03).toFixed(2) : "0.00"}
+              -${betAmount ? (Number(betAmount) * 0.03).toFixed(2) : "0.00"}
             </h5>
           </div>
 
           <div className="yourchoice_change">
             <h6 className="potencial_win_per" style={{ ...pageStyle.potencial_win_per, fontWeight: "600" }}>
-              Total Deducted
+              Net Staked
             </h6>
             <h5 className="potencial_win_value" style={{ ...pageStyle.potencial_win_value, fontWeight: "600" }}>
-              ${betAmount ? (Number(betAmount) * 1.03).toFixed(2) : "0.00"}
+              ${betAmount ? (Number(betAmount) * 0.97).toFixed(2) : "0.00"}
             </h5>
           </div>
 

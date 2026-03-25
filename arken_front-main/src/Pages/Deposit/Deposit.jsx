@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import "./Deposit.css";
 import useState from "react-usestateref";
 import { moderateScale } from "../../utils/Scale";
@@ -52,6 +52,8 @@ import { parseEther } from 'viem';
 import { getMethod, postMethod } from "../../core/sevice/common.api";
 import apiService from "../../core/sevice/detail";
 import { useTelegramUser } from "../../context/TelegramUserContext";
+import { useChain } from "../../context/ChainContext";
+import { io } from "socket.io-client";
 import BottomTab from "../BottomTab/BottomTab";
 // import nacl from "tweetnacl";
 
@@ -66,9 +68,12 @@ const SOLANA_RPC = "https://api.mainnet-beta.solana.com";
 const Deposit = () => {
   const [searchParams] = useSearchParams();
   const { telegramUser } = useTelegramUser();
+  const { activeChain } = useChain();
   // const telegramUserID = "1453204703";
   const telegramUserID = telegramUser?.telegramId;
   const navigate = useNavigate();
+  const [depositConfirmed, setDepositConfirmed] = useState(null); // { amount, chain, currencySymbol, txHash }
+  const socketRef = useRef(null);
   const [amount, setAmount] = useState("");
   const [selectedCurrency, setSelectedCurrency] = useState("");
     const [dappKeyPair] = useState(nacl.box.keyPair());
@@ -93,6 +98,7 @@ const Deposit = () => {
   const [addressError,setAddressError]=useState('')
   const [withdrawAddress,setWithdrawAddress]=useState('')
   const [withdrawTxId, setWithdrawTxId] = useState('')
+  const [depositTxId, setDepositTxId] = useState('')
   const detectNetwork = (address) => {
   if (address.startsWith("0x")) return "evm";
   if (address.length >= 32 && address.length <= 44) return "solana";
@@ -137,6 +143,28 @@ const handleWithdrawAddress = (e) => {
   useEffect(() => {
     getCurrenyList();
   }, [0]);
+
+  // WebSocket: listen for deposit_confirmed when using custodial wallet
+  useEffect(() => {
+    const walletName = localStorage.getItem("walletName");
+    if (walletName !== "newwallet" || !telegramUserID) return;
+
+    const socket = io({ path: "/socket.io" });
+    socketRef.current = socket;
+
+    socket.on("connect", () => {
+      socket.emit("join_user", String(telegramUserID));
+    });
+
+    socket.on("deposit_confirmed", (data) => {
+      setDepositConfirmed(data);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [telegramUserID]);
 
   const [currencyList, setCurrencyList] = useState([
     { value: "sol", label: "SOL", key: "sol", depositLimit: 0 },
@@ -682,7 +710,7 @@ console.log(error,"dsfdsfs")
             nonce,
             phantomSession.sharedSecret
           );
-          const redirectUrl = `${env.frontUrl}wallet-success?uuid=${userWallet.uniqueId}`;
+          const redirectUrl = `${window.location.origin}/wallet-success?uuid=${userWallet.uniqueId}`;
           const dappPubKey = phantomSession.dappPublicKey || sessionStorage.getItem('dappPublicKey');
           const params = new URLSearchParams({
             dapp_encryption_public_key: dappPubKey,
@@ -876,9 +904,9 @@ console.log(error,"dsfdsfs")
       } catch (e) {
         console.error("Backend save failed:", e);
       }
-      showSuccessToast("Deposit successful");
-      navigate("/markets");
-  
+      showSuccessToast("Deposit submitted!");
+      setDepositTxId(tx.signature);
+
     } catch (err) {
       console.error("Deposit error:", err);
       showErrorToast(err?.message || "Transaction failed");
@@ -1257,11 +1285,11 @@ const depositViaSolanaPay = async () => {
     setdepositLoader(false);
 
     if (resp.success) {
-      showSuccessToast(resp.message || "Deposit successful!");
+      showSuccessToast(resp.message || "Deposit submitted!");
       setdepositAmount(0);
       setSelectedCurrency("");
       setSelectedCurrencyLabel("");
-      navigate("/markets");
+      setDepositTxId("pending");
     } else {
       showErrorToast(resp.message || "Failed to record deposit");
     }
@@ -1489,8 +1517,8 @@ const getTransaction = async () => {
         setdepositLoader(false);
 
         if (resp.success) {
-          showSuccessToast(resp.message);
-          navigate("/markets");
+          showSuccessToast("Deposit submitted!");
+          setDepositTxId("pending");
         } else {
           showErrorToast("Transaction failed, please try again");
         }
@@ -1572,6 +1600,43 @@ const getTransaction = async () => {
   // }; ARB TRANSFER
   return (
     <>
+      {/* Deposit Confirmed Popup */}
+      {depositConfirmed && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", zIndex: 9999,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
+        }}>
+          <div style={{
+            background: "#1a1a2e", borderRadius: "16px", padding: "28px 24px",
+            width: "100%", maxWidth: "340px", textAlign: "center",
+            border: "1px solid rgba(99,102,241,0.4)",
+          }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎉</div>
+            <h3 style={{ color: "#4ade80", fontSize: "18px", fontWeight: 700, margin: "0 0 8px" }}>
+              Deposit Confirmed!
+            </h3>
+            <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "14px", margin: "0 0 16px" }}>
+              <strong style={{ color: "#fff", fontSize: "22px" }}>
+                ${depositConfirmed.amount?.toFixed(2)}
+              </strong>{" "}
+              {depositConfirmed.currencySymbol} received on {depositConfirmed.chain}
+            </p>
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "11px", wordBreak: "break-all", margin: "0 0 20px" }}>
+              Tx: {depositConfirmed.txHash?.slice(0, 16)}...{depositConfirmed.txHash?.slice(-8)}
+            </p>
+            <button
+              onClick={() => setDepositConfirmed(null)}
+              style={{
+                width: "100%", padding: "12px", borderRadius: "10px", border: "none",
+                background: "#6366f1", color: "#fff", fontWeight: 700, fontSize: "14px", cursor: "pointer",
+              }}
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
+
       <div
         className="main_marketdetailsdiv"
         style={pageStyle.main_marketdetailsdiv}
@@ -1644,14 +1709,15 @@ const getTransaction = async () => {
                       <div className="deposit-form-container">
 
                         {localStorage.getItem('walletName')== 'newwallet'?
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '16px' }}>
                         <ImageComponent
-                      styles={pageStyle.obrd_middl_tpImg}
-                      // imgPic={`https://quickchart.io/chart?chs=168x168&chld=M|0&cht=qr&chl=${Addressref.current}`}
-                        imgPic={`https://quickchart.io/chart?chs=168x168&chld=M|0&cht=qr&chl=${encodeURIComponent(Addressref.current)}`}
+                      styles={{ width: '240px', height: '240px', display: 'block' }}
+                        imgPic={`https://quickchart.io/chart?chs=240x240&chld=M|0&cht=qr&chl=${encodeURIComponent(Addressref.current)}`}
 
                       alt="obrd_middl_tpImg"
-                      className="qrcodeBox m-5"
+                      className="qrcodeBox"
                     />
+                        </div>
                         :  <><div className="form-field" style={pageStyle.formfield}>
                           <label
                             className="field-label"
@@ -1876,8 +1942,13 @@ const getTransaction = async () => {
         📋 How to deposit
       </p>
       <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0 0 4px" }}>1. Copy your wallet address above</p>
-      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0 0 4px" }}>2. Send SOL or USDC to that address from your external wallet</p>
-      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0" }}>3. Your balance will be credited automatically within 5–10 minutes ✅</p>
+      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0 0 4px" }}>
+        2. Send <strong style={{ color: "#fff" }}>{activeChain === "SOL" ? "USDC" : "USDT"}</strong> ({activeChain === "SOL" ? "Solana network" : "Arbitrum network"}) to that address from your external wallet
+      </p>
+      <p style={{ color: "#f97316", fontSize: "12px", margin: "0 0 4px" }}>
+        ⚠️ Do NOT send native {activeChain === "SOL" ? "SOL" : "ETH"} — only {activeChain === "SOL" ? "USDC" : "USDT"} is supported
+      </p>
+      <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "12px", margin: "0" }}>3. Your balance will be credited automatically ✅</p>
     </div>
   )}
   {localStorage.getItem('walletName')== 'newwallet'?""
@@ -1906,6 +1977,26 @@ const getTransaction = async () => {
                         >
                           Deposit
                         </button>
+                      )}
+
+                      {/* Deposit processing status */}
+                      {depositTxId && (
+                        <div style={{ marginTop: "16px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: "10px", padding: "12px 14px" }}>
+                          <p style={{ color: "#4ade80", fontWeight: 700, fontSize: "13px", margin: "0 0 4px" }}>
+                            🔄 Deposit Processing
+                          </p>
+                          <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "12px", margin: "0 0 4px" }}>
+                            Your deposit is being confirmed on-chain. Balance typically credited within <strong style={{ color: "#fff" }}>5–10 minutes</strong>.
+                          </p>
+                          {depositTxId !== "pending" && (
+                            <span
+                              style={{ color: "rgba(255,255,255,0.45)", fontSize: "11px", wordBreak: "break-all", cursor: "pointer" }}
+                              onClick={() => { navigator.clipboard.writeText(depositTxId).catch(() => {}); showSuccessToast("Copied!"); }}
+                            >
+                              Tx: {depositTxId}
+                            </span>
+                          )}
+                        </div>
                       )}
 
                       {/* Deposit History */}
@@ -2112,7 +2203,7 @@ const getTransaction = async () => {
 
                            <div style={{ position: "relative", width: "100%" }}>
                             <textarea
-  rows={3}
+  rows={2}
   value={withdrawAddress}
   onChange={handleWithdrawAddress}
   placeholder="Enter withdraw address"
@@ -2120,12 +2211,15 @@ const getTransaction = async () => {
   style={{
     ...pageStyle.addesssInput,
     width: "100%",
-    minHeight: "72px",
+    minHeight: "56px",
     resize: "none",
-    paddingRight: "72px",
-    fontSize: "13px",
-    lineHeight: "1.5",
+    paddingRight: "68px",
+    fontSize: "12px",
+    lineHeight: "1.4",
     wordBreak: "break-all",
+    textAlign: "left",
+    verticalAlign: "top",
+    color: "#fff",
   }}
 />
 <button
@@ -2206,13 +2300,14 @@ const getTransaction = async () => {
 
                       {/* Withdrawal TXN confirmation */}
                       {withdrawTxId && (
-                        <div style={{ marginTop: "16px", background: "rgba(255,255,255,0.07)", borderRadius: "10px", padding: "12px 14px" }}>
-                          <p style={{ color: "#4ade80", fontWeight: 700, fontSize: "13px", margin: "0 0 6px" }}>
-                            ✅ Withdrawal Submitted
+                        <div style={{ marginTop: "16px", background: "rgba(74,222,128,0.08)", border: "1px solid rgba(74,222,128,0.3)", borderRadius: "10px", padding: "12px 14px" }}>
+                          <p style={{ color: "#4ade80", fontWeight: 700, fontSize: "13px", margin: "0 0 4px" }}>
+                            🔄 Withdrawal Processing
                           </p>
-                          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "11px", margin: "0 0 4px" }}>
-                            Transaction Hash:
+                          <p style={{ color: "rgba(255,255,255,0.65)", fontSize: "12px", margin: "0 0 6px" }}>
+                            Submitted successfully. Funds typically arrive within <strong style={{ color: "#fff" }}>10–30 minutes</strong>.
                           </p>
+                          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "11px", margin: "0 0 2px" }}>Transaction Hash:</p>
                           <span
                             style={{ color: "#fff", fontSize: "11px", wordBreak: "break-all", cursor: "pointer" }}
                             onClick={() => {
@@ -2320,8 +2415,9 @@ const pageStyle = {
     height: `${moderateScale(21)}px`,
   },
   dropdownitem: {
-    padding: `${moderateScale(16)}px ${moderateScale(20)}px`,
-    fontSize: `${moderateScale(16)}px`,
+    padding: `${moderateScale(12)}px ${moderateScale(16)}px`,
+    fontSize: `${moderateScale(14)}px`,
+    color: "#fff",
   },
   fieldlabel: {
     fontSize: `${moderateScale(14)}px`,
@@ -2360,7 +2456,8 @@ const pageStyle = {
     marginBottom: `${moderateScale(4)}px`,
   },
   currencytext: {
-    fontSize: `${moderateScale(16)}px`,
+    fontSize: `${moderateScale(14)}px`,
+    color: "#fff",
   },
   amountbtn: {
     fontSize: `${moderateScale(32)}px`,

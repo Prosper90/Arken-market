@@ -6,14 +6,6 @@ import wllt_top_img from "../../assets/image/wllt_top_img.webp";
 import wllt_img from "../../assets/image/wllt_img.webp";
 import obrd_middl_wllImg1 from "../../assets/image/obrd_middl_wllImg1.webp";
 import copy_img from "../../assets/image/copy_img.webp";
-import totl_img from "../../assets/image/totl_img.webp";
-import trophy_img from "../../assets/image/trophy_img.webp";
-import percentage_img from "../../assets/image/percentage_img.webp";
-import clock_img from "../../assets/image/clock_img.webp";
-import security_img from "../../assets/image/security_img.webp";
-import bsc_img from "../../assets/image/bsc_img.webp";
-import ethereum_img from "../../assets/image/ethereum_img.webp";
-import polygon_img from "../../assets/image/polygon_img.webp";
 import arbitrum_img from "../../assets/image/arbitrum_img.webp";
 import apiService from "../../core/sevice/detail";
 import { postMethod, getMethod } from "../../core/sevice/common.api";
@@ -21,10 +13,10 @@ import supptNetwrk_img from "../../assets/image/supptNetwrk_img.webp";
 import "./wallet.css";
 import { IoArrowDownCircleOutline } from "react-icons/io5";
 import { IoArrowUpCircleOutline } from "react-icons/io5";
-import { IoIosArrowForward } from "react-icons/io";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useTelegramUser } from "../../context/TelegramUserContext";
+import { useChain } from "../../context/ChainContext";
 import walletIMG from "../../assets/image/wllt_img.webp";
 
 const Wallet = () => {
@@ -38,6 +30,8 @@ const Wallet = () => {
   const [walletAddress, setWalletAddress] = useState(localStorage.getItem('walletAddress'));
   const [activeBets, setActiveBets] = useState([]);
   const { telegramUser } = useTelegramUser();
+  const { activeChain, switchChain } = useChain();
+  const [custodialWallets, setCustodialWallets] = useState([]);
  const [userWallet, setUserWallet] = useState({
   isConnected: false,
   walletAddress: "",
@@ -116,8 +110,11 @@ const Wallet = () => {
           walletName: resp.data.wallet?.walletName || "",
           uniqueId: resp.data.uniqueId || "",
         });
+        if (Array.isArray(resp.data.custodialWallets) && resp.data.custodialWallets.length > 0) {
+          setCustodialWallets(resp.data.custodialWallets);
+        }
         if(resp.data.wallet?.isConnected == true){
-          setWalletAddress(resp.data.wallet?.walletAddress )
+          setWalletAddress(resp.data.wallet?.walletAddress)
         }
       } else {
         console.error(resp.message || "Failed to fetch user details");
@@ -387,22 +384,58 @@ const Wallet = () => {
                 : "MetaMask"}
             </span>
 
-            <div className="wallet_id_Wrp" style={pageStyle.wallet_id_Wrp}>
-              <div className="wallet_id" style={pageStyle.wallet_id}>
-                <span>{truncateAddress(walletAddress)}</span>
+            {walletName === "newwallet" && custodialWallets.length > 0 ? (
+              <>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 8 }}>
+                  {["ARB", "SOL"].map(c => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        switchChain(c);
+                        const w = custodialWallets.find(x => x.network === c);
+                        if (w) { setWalletAddress(w.address); localStorage.setItem("walletAddress", w.address); }
+                      }}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: activeChain === c ? "#6366f1" : "rgba(255,255,255,0.08)",
+                        color: "#fff", fontWeight: activeChain === c ? 700 : 400, fontSize: 12,
+                      }}
+                    >
+                      {c === "ARB" ? "Arbitrum" : "Solana"}
+                    </button>
+                  ))}
+                </div>
+                <div className="wallet_id_Wrp" style={pageStyle.wallet_id_Wrp}>
+                  <div className="wallet_id" style={pageStyle.wallet_id}>
+                    <span>{truncateAddress(custodialWallets.find(w => w.network === activeChain)?.address || walletAddress)}</span>
+                  </div>
+                  <span
+                    className="wallet_id_Icon"
+                    style={pageStyle.wallet_id_Icon}
+                    onClick={() => copy(custodialWallets.find(w => w.network === activeChain)?.address || walletAddress)}
+                  >
+                    <ImageComponent styles={pageStyle.copy_img} imgPic={copy_img} alt="copy_img" />
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="wallet_id_Wrp" style={pageStyle.wallet_id_Wrp}>
+                <div className="wallet_id" style={pageStyle.wallet_id}>
+                  <span>{truncateAddress(walletAddress)}</span>
+                </div>
+                <span
+                  className="wallet_id_Icon"
+                  style={pageStyle.wallet_id_Icon}
+                  onClick={() => copy(walletAddress)}
+                >
+                  <ImageComponent
+                    styles={pageStyle.copy_img}
+                    imgPic={copy_img}
+                    alt="copy_img"
+                  />
+                </span>
               </div>
-              <span
-                className="wallet_id_Icon"
-                style={pageStyle.wallet_id_Icon}
-                onClick={() => copy(walletAddress)}
-              >
-                <ImageComponent
-                  styles={pageStyle.copy_img}
-                  imgPic={copy_img}
-                  alt="copy_img"
-                />
-              </span>
-            </div>
+            )}
           </div>
 
           <button
@@ -428,94 +461,56 @@ const Wallet = () => {
         <div className="wllt_winPec_Wrp" style={pageStyle.wllt_winPec_Wrp}>
           <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
             <h6 style={pageStyle.wllt_win_ItmHead}>
-              <ImageComponent
-                styles={pageStyle.wllt_win_ItmImg}
-                imgPic={totl_img}
-                alt="totl_img"
-              />
+              <span style={pageStyle.wllt_win_ItmEmoji}>🗳️</span>
               <span>Total Bets</span>
             </h6>
-
             {loadingProfile ? (
-    <div className="skl skl-number-sm" />
-  ) : (
-    <h4 style={pageStyle.wllt_win_ItmValue}>
-              {userProfile && userProfile.totalPredictions
-                ? userProfile.totalPredictions
-                : 0}
-            </h4>
-  )}
-
-           
+              <div className="skl skl-number-sm" />
+            ) : (
+              <h4 style={pageStyle.wllt_win_ItmValue}>
+                {userProfile && userProfile.totalPredictions ? userProfile.totalPredictions : 0}
+              </h4>
+            )}
           </div>
           <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
             <h6 style={pageStyle.wllt_win_ItmHead}>
-              <ImageComponent
-                styles={pageStyle.wllt_win_ItmImg}
-                imgPic={trophy_img}
-                alt="trophy_img"
-              />
+              <span style={pageStyle.wllt_win_ItmEmoji}>💎</span>
               <span>Total Winnings</span>
             </h6>
-             {loadingProfile ? (
-    <div className="skl skl-number-sm" />
-  ) : (
-     <h4 style={pageStyle.wllt_win_ItmValue}>
-              {userProfile && userProfile.totalWins ? userProfile.totalWins : 0}
-            </h4>
-  )}
-           
+            {loadingProfile ? (
+              <div className="skl skl-number-sm" />
+            ) : (
+              <h4 style={pageStyle.wllt_win_ItmValue}>
+                {userProfile && userProfile.totalWins ? userProfile.totalWins : 0}
+              </h4>
+            )}
           </div>
           <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
             <h6 style={pageStyle.wllt_win_ItmHead}>
-              <ImageComponent
-                styles={pageStyle.wllt_win_ItmImg}
-                imgPic={percentage_img}
-                alt="percentage_img"
-              />
+              <span style={pageStyle.wllt_win_ItmEmoji}>📈</span>
               <span>Win Rate</span>
             </h6>
-             {loadingProfile ? (
-    <div className="skl skl-number-sm" />
-  ) : (
-     <h4 style={pageStyle.wllt_win_ItmValue}>
-              {userProfile && userProfile.winRate
-                ? `${Number(userProfile.winRate).toFixed(2)}%`
-                : "0%"}
-            </h4>
-  )}
-           
+            {loadingProfile ? (
+              <div className="skl skl-number-sm" />
+            ) : (
+              <h4 style={pageStyle.wllt_win_ItmValue}>
+                {userProfile && userProfile.winRate ? `${Number(userProfile.winRate).toFixed(2)}%` : "0%"}
+              </h4>
+            )}
           </div>
           <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
             <h6 style={pageStyle.wllt_win_ItmHead}>
-              <ImageComponent
-                styles={pageStyle.wllt_win_ItmImg}
-                imgPic={clock_img}
-                alt="clock_img"
-              />
+              <span style={pageStyle.wllt_win_ItmEmoji}>⏳</span>
               <span>Active Bets</span>
             </h6>
             {loadingProfile ? (
-    <div className="skl skl-number-sm" />
-  ) : (
-     <h4 style={pageStyle.wllt_win_ItmValue}>
-              {activeBets && activeBets.length ? activeBets.length : "0"}
-            </h4>
-  )}
-           
+              <div className="skl skl-number-sm" />
+            ) : (
+              <h4 style={pageStyle.wllt_win_ItmValue}>
+                {activeBets && activeBets.length ? activeBets.length : "0"}
+              </h4>
+            )}
           </div>
-        </div>
-
-        <div className="wllt_sectNots_wrp" style={pageStyle.wllt_sectNots_wrp}>
-          <ImageComponent
-            styles={pageStyle.wllt_sectNots_img}
-            imgPic={security_img}
-            alt="security_img"
-          />
-          <h6 style={pageStyle.wllt_sectNots_cnt}>Security Noticies</h6>
-          <span className="wllt_sectNots_icon">
-            <IoIosArrowForward style={pageStyle.wllt_sectNots_icon} />{" "}
-          </span>
         </div>
 
         <div className="wllt_supp_wrp" style={pageStyle.wllt_supp_wrp}>
@@ -531,34 +526,14 @@ const Wallet = () => {
             <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
               <ImageComponent
                 styles={pageStyle.wllt_supp_colimg}
-                imgPic={ethereum_img}
-                alt="ethereum_img"
-              />
-              <h6 style={pageStyle.wllt_supp_colCnt}>Ethereum</h6>
-            </div>
-            <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
-              <ImageComponent
-                styles={pageStyle.wllt_supp_colimg}
-                imgPic={polygon_img}
-                alt="polygon_img"
-              />
-              <h6 style={pageStyle.wllt_supp_colCnt}>Polygon</h6>
-            </div>
-            <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
-              <ImageComponent
-                styles={pageStyle.wllt_supp_colimg}
                 imgPic={arbitrum_img}
                 alt="arbitrum_img"
               />
               <h6 style={pageStyle.wllt_supp_colCnt}>Arbitrum</h6>
             </div>
             <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
-              <ImageComponent
-                styles={pageStyle.wllt_supp_colimg}
-                imgPic={bsc_img}
-                alt="bsc_img"
-              />
-              <h6 style={pageStyle.wllt_supp_colCnt}>BSC</h6>
+              <span style={{ fontSize: pageStyle.wllt_supp_colimg.width, lineHeight: 1 }}>◎</span>
+              <h6 style={pageStyle.wllt_supp_colCnt}>Solana</h6>
             </div>
           </div>
         </div>
@@ -681,6 +656,10 @@ const pageStyle = {
   wllt_win_ItmImg: {
     width: `${moderateScale(17)}px`,
     height: `${moderateScale(17)}px`,
+  },
+  wllt_win_ItmEmoji: {
+    fontSize: `${moderateScale(17)}px`,
+    lineHeight: 1,
   },
   wllt_win_ItmValue: {
     fontSize: `${moderateScale(20)}px`,

@@ -45,12 +45,14 @@ const CreateMarket = () => {
   const [endDate, setEndDate] = useState('');
   const [startDate, setStartDate] = useState(toDatetimeLocal(new Date()));
   const [oracleType, setOracleType] = useState('manual');
+  const [chain, setChain] = useState('EVM');
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(null);
 
   // New fields
   const [tags, setTags] = useState([]);
   const [initialLiquidity, setInitialLiquidity] = useState('');
+  const [creatorOutcomeIndex, setCreatorOutcomeIndex] = useState(0);
   const [probabilities, setProbabilities] = useState([51.5, 48.5]);
   const [rawInputs, setRawInputs] = useState(['51.5', '48.5']);
 
@@ -59,6 +61,8 @@ const CreateMarket = () => {
     const equal = spreadSplit(outcomes.length);
     setProbabilities(equal);
     setRawInputs(equal.map(String));
+    // Clamp creatorOutcomeIndex if outcomes shrink
+    setCreatorOutcomeIndex(prev => Math.min(prev, outcomes.length - 1));
   }, [outcomes.length]);
 
   // Always default to manual when visibility changes (AI removed)
@@ -142,6 +146,10 @@ const CreateMarket = () => {
       toast.error('Question must be 10–150 characters');
       return;
     }
+    if (!question.trim().endsWith('?')) {
+      toast.error('Question must end with a "?" — e.g. "Will BTC reach $100k?"');
+      return;
+    }
     const cleanOutcomes = outcomes.map(o => o.trim()).filter(Boolean);
     if (cleanOutcomes.length < 2) {
       toast.error('Provide at least 2 outcomes');
@@ -160,7 +168,7 @@ const CreateMarket = () => {
       return;
     }
     if (!initialLiquidity || Number(initialLiquidity) < 1) {
-      toast.error('Initial liquidity must be at least 1 USDC');
+      toast.error(`Initial liquidity must be at least 1 ${chain === 'EVM' ? 'USDT' : 'USDC'}`);
       return;
     }
     if (!telegramId) {
@@ -182,17 +190,20 @@ const CreateMarket = () => {
           telegramId,
           tags,
           initialLiquidity: Number(initialLiquidity),
+          creatorOutcomeIndex,
           probabilities,
+          chain,
         },
       });
 
       if (resp && resp.success) {
-        if (isPrivate && resp.inviteCode) {
-          setSuccessModal({ inviteCode: resp.inviteCode, inviteLink: resp.inviteLink });
-        } else {
-          toast.success('Market submitted for review!');
-          navigate('/markets');
-        }
+        setSuccessModal({
+          inviteCode: resp.inviteCode || null,
+          inviteLink: resp.inviteLink || null,
+          marketAddress: resp.marketAddress || null,
+          isPrivate: !!resp.inviteCode,
+          chain,
+        });
       } else {
         toast.error(resp?.message || 'Failed to create market');
       }
@@ -218,8 +229,11 @@ const CreateMarket = () => {
   tomorrow.setDate(tomorrow.getDate() + 1);
   const minEnd = toDatetimeLocal(tomorrow);
 
+  const currency = chain === 'EVM' ? 'USDT' : 'USDC';
   const netLiquidity = initialLiquidity ? Number(initialLiquidity).toFixed(2) : '0.00';
-  const totalCost = initialLiquidity ? (Number(initialLiquidity) + 1).toFixed(2) : '1.00';
+  const totalCost = initialLiquidity
+    ? (Number(initialLiquidity) + (oracleType === 'uma' ? 1 : 0)).toFixed(2)
+    : oracleType === 'uma' ? '1.00' : '0.00';
 
   return (
     <div className="cm_main">
@@ -227,6 +241,24 @@ const CreateMarket = () => {
       <div className="cm_header">
         <button className="cm_backBtn" onClick={() => navigate(-1)}>&#8592;</button>
         <h2 className="cm_title">Create Market</h2>
+        <select
+          value={chain}
+          onChange={e => setChain(e.target.value)}
+          style={{
+            marginLeft: 'auto',
+            background: '#1a1a2e',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.18)',
+            borderRadius: 8,
+            padding: '4px 8px',
+            fontSize: 12,
+            cursor: 'pointer',
+            outline: 'none',
+          }}
+        >
+          <option value="EVM">⬡ EVM (ARB)</option>
+          <option value="SOL">◎ Solana</option>
+        </select>
       </div>
 
       <div className="cm_form">
@@ -243,6 +275,9 @@ const CreateMarket = () => {
           />
           <span className={`cm_charCount${question.length > 130 ? ' warn' : ''}`}>
             {question.length}/150
+          </span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 4, display: 'block' }}>
+            Must be a genuine question ending with "?" · Reviewed by admin before going live
           </span>
         </div>
 
@@ -317,7 +352,7 @@ const CreateMarket = () => {
           <label className="cm_label">Liquidity</label>
           <div className="cm_liquidityRow">
             <div className="cm_liquidityInput">
-              <label className="cm_subLabel">Initial Liquidity (USDC)</label>
+              <label className="cm_subLabel">Initial Liquidity ({currency})</label>
               <input
                 type="number"
                 className="cm_numInput"
@@ -329,14 +364,37 @@ const CreateMarket = () => {
             </div>
             <div className="cm_liquidityNet">
               <label className="cm_subLabel">Liquidity going into market</label>
-              <div className="cm_netValue">{netLiquidity} USDC</div>
+              <div className="cm_netValue">{netLiquidity} {currency}</div>
             </div>
           </div>
           <div style={{ marginTop: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.5)', display: 'flex', justifyContent: 'space-between' }}>
-            <span>+ $1.00 oracle fee</span>
-            <span style={{ color: 'rgba(255,255,255,0.75)' }}>Total deducted: <strong>{totalCost} USDC</strong></span>
+            {oracleType === 'uma' && <span>+ $1.00 UMA oracle fee</span>}
+            <span style={{ color: 'rgba(255,255,255,0.75)', marginLeft: 'auto' }}>Total deducted: <strong>{totalCost} {currency}</strong></span>
           </div>
         </div>
+
+        {/* Creator Initial Position */}
+        {initialLiquidity && Number(initialLiquidity) >= 1 && (
+          <div className="cm_field">
+            <label className="cm_label">Your Initial Position</label>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 8 }}>
+              Which outcome are you backing with your {Number(initialLiquidity).toFixed(2)} {currency}?
+            </p>
+            <div className="cm_outcomesWrp">
+              {outcomes.map((o, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`cm_toggleBtn${creatorOutcomeIndex === idx ? ' active' : ''}`}
+                  style={{ marginBottom: 6, textAlign: 'left' }}
+                  onClick={() => setCreatorOutcomeIndex(idx)}
+                >
+                  {o || `Outcome ${idx + 1}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Probabilities */}
         <div className="cm_field">
@@ -428,26 +486,62 @@ const CreateMarket = () => {
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? 'Submitting...' : 'Create Market'}
+          {loading ? 'Deploying...' : 'Create Market'}
         </button>
       </div>
 
-      {/* Success Modal for private market */}
+      {/* Success Modal */}
       {successModal && (
         <div className="cm_modalOverlay">
           <div className="cm_modal">
             <div className="cm_modalIcon">🎉</div>
-            <h3 className="cm_modalTitle">Market Created!</h3>
+            <h3 className="cm_modalTitle">Market Live!</h3>
             <p className="cm_modalSub">
-              Share this invite code with friends so they can join your private market.
+              {successModal.isPrivate
+                ? 'Your market is deployed on-chain. Share this invite code with friends to join.'
+                : 'Your market is deployed on-chain and is now live.'}
             </p>
-            <div className="cm_codeBox">
-              <div className="cm_codeLabel">Invite Code</div>
-              <div className="cm_code">{successModal.inviteCode}</div>
-            </div>
-            <button className="cm_copyBtn" onClick={copyInviteCode}>
-              📋 Copy Invite Link
-            </button>
+            {successModal.marketAddress && (() => {
+              const addr = successModal.marketAddress;
+              const short = addr.length > 16 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
+              const explorerUrl = successModal.chain === 'SOL'
+                ? `https://solscan.io/account/${addr}`
+                : `https://arbiscan.io/address/${addr}`;
+              return (
+                <div className="cm_codeBox" style={{ marginBottom: 8 }}>
+                  <div className="cm_codeLabel">Contract Address</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <a
+                      href={explorerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="cm_code"
+                      style={{ fontSize: 13, textDecoration: 'underline', cursor: 'pointer' }}
+                    >
+                      {short}
+                    </a>
+                    <button
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 14 }}
+                      title="Copy address"
+                      onClick={() => navigator.clipboard.writeText(addr)}
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+            {successModal.isPrivate && (
+              <>
+                <div className="cm_codeBox">
+                  <div className="cm_codeLabel">Invite Code</div>
+                  <div className="cm_code">{successModal.inviteCode}</div>
+                </div>
+                <button className="cm_copyBtn" onClick={copyInviteCode}>
+                  📋 Copy Invite Link
+                </button>
+              </>
+            )}
             <button
               className="cm_modalCloseBtn"
               onClick={() => {

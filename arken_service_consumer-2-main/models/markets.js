@@ -82,6 +82,25 @@ const marketSchema = new mongoose.Schema(
     umaAssertionId: { type: String, default: null },
     umaVerdict: { type: String, default: null },
     umaSubmittedAt: { type: Date, default: null },
+
+    // Per-user LP positions
+    lpProviders: [
+      {
+        telegramId: { type: Number },
+        amount: { type: Number },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // On-chain identifiers
+    source: {
+      type: String,
+      enum: ["manual", "poly", "arken", "solana"],
+      default: "manual",
+      index: true,
+    },
+    arkenMarketAddress: { type: String, default: null, index: true },
+    solanaMarketId: { type: String, default: null, index: true },
   },
   {
     timestamps: true,

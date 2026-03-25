@@ -85,9 +85,9 @@ import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 // import { useTelegramUser } from "../../context/TelegramUserContext";
 // import { getAccount, getBalance } from "@wagmi/core";
 import { LuInfo } from "react-icons/lu";
-
-window.Telegram.WebApp.ready();
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+
+window.Telegram?.WebApp?.ready();
 // const SOLANA_RPC = "https://api.mainnet.solana.com";
 const SOLANA_RPC =
   "https://mainnet.helius-rpc.com/?api-key=05031ac5-0873-42a5-bb11-1c124bb119b0";
@@ -160,17 +160,6 @@ const style = {
   transform: "translate(-50%, -50%)",
   boxShadow: 24,
 };
-
-import {
-  PhantomProvider,
-  usePhantom,
-  useModal,
-  darkTheme,
-  AddressType,
-} from "@phantom/react-sdk";
-import WalletComponent from "../../WalletComponent";
-
-import { createKeypair } from "../../utils/phantomCrypto";
 
 const Onboarding = () => {
   const generateUniqueId = () => uuidv4();
@@ -328,7 +317,10 @@ const Onboarding = () => {
   const pagedirect = `${env.frontUrl}wallet-details/${generateId}`;
 
   const saveUniqId = async (uniqueId) => {
-    const telegramIdVef = telegramUser?.telegramId;
+    const telegramIdVef =
+      telegramUser?.telegramId ||
+      telegramUsertelegramId ||
+      localStorage.getItem("telegramId");
     if (!telegramIdVef) {
       throw new Error("Telegram session not found. Please restart the app.");
     }
@@ -369,8 +361,6 @@ const Onboarding = () => {
         payload: { telegramId: telegramUser?.telegramId },
         // payload: { telegramId: telegramUser?.telegramId||"5100502824"},
       });
-      console.log(resp, "===resp");
-
       if (resp.success && resp.data) {
         setUserWallet({
           isConnected: resp.data.wallet?.isConnected || false,
@@ -384,28 +374,43 @@ const Onboarding = () => {
         ) {
           localStorage.setItem("walletName", "phantom");
           setwalletName("phantom");
-          localStorage.setItem(
-            "walletAddress",
-            resp.data.wallet?.walletAddress,
-          );
+          localStorage.setItem("walletAddress", resp.data.wallet?.walletAddress);
           setAddress(resp.data.wallet?.walletAddress);
         }
-        //  else {
-        //   localStorage.setItem("walletName", "metamask");
-        //   setwalletName("metamask");
-        // }
-        const parsed = JSON.parse(resp?.data?.jsonData);
 
-        setPhantomSession({
-          ...parsed,
-          sharedSecret: bs58.decode(parsed.sharedSecret),
-          nonce: bs58.decode(parsed.nonce),
-        });
+        // Phantom session (optional — only set when user has connected Phantom)
+        try {
+          if (resp?.data?.jsonData) {
+            const parsed = JSON.parse(resp.data.jsonData);
+            setPhantomSession({
+              ...parsed,
+              sharedSecret: bs58.decode(parsed.sharedSecret),
+              nonce: bs58.decode(parsed.nonce),
+            });
+          }
+        } catch (e) { /* jsonData not set for this user yet */ }
 
-        // Set custodial wallets if user has any
-        if (Array.isArray(resp.data.custodialWallets) && resp.data.custodialWallets.length > 0) {
-          setCustodialWallets(resp.data.custodialWallets);
+        // ── Auto-wallet logic ──────────────────────────────────────────────
+        if (
+          Array.isArray(resp.data.custodialWallets) &&
+          resp.data.custodialWallets.length > 0
+        ) {
+          const wallets = resp.data.custodialWallets;
+          setCustodialWallets(wallets);
+
+          // Auto-reconnect if not already connected
+          const alreadySet =
+            localStorage.getItem("walletName") === "newwallet" &&
+            localStorage.getItem("walletAddress");
+          if (!alreadySet) {
+            reconnectCustodialWallet(wallets);
+          }
+        } else if (!walletCreationAttempted.current) {
+          // New user — auto-create both ARB + SOL wallets on first load
+          walletCreationAttempted.current = true;
+          createNewWalletFunc();
         }
+        // ──────────────────────────────────────────────────────────────────
       } else {
         console.error(resp.message || "Failed to fetch user details");
       }
@@ -462,8 +467,14 @@ const Onboarding = () => {
   };
 
   const sendusdcfn = async () => {
-    if (!phantomSession || !phantomSession.session || !phantomSession.sharedSecret) {
-      showErrorToast("Phantom session not found. Please reconnect your wallet.");
+    if (
+      !phantomSession ||
+      !phantomSession.session ||
+      !phantomSession.sharedSecret
+    ) {
+      showErrorToast(
+        "Phantom session not found. Please reconnect your wallet.",
+      );
       setdepositLoader(false);
       return;
     }
@@ -484,19 +495,6 @@ const Onboarding = () => {
     }
   };
 
-  useEffect(() => {
-    getTransaction();
-  });
-  const getTransaction = async () => {
-    try {
-      var data = {
-        apiUrl: apiService.get_deposit_list,
-        // payload: obj,
-      };
-      var resp = await postMethod(data);
-      console.log(resp);
-    } catch (error) {}
-  };
   async function sendUSDC({
     fromPublicKey,
     toAddress,
@@ -594,7 +592,10 @@ const Onboarding = () => {
 
       // Build Phantom signTransaction deep link
       // dappPublicKey is persisted in the backend session so it survives mini-app restarts
-      const dappPubKey = phantomSession.dappPublicKey || d_key_public || sessionStorage.getItem('dappPublicKey');
+      const dappPubKey =
+        phantomSession.dappPublicKey ||
+        d_key_public ||
+        sessionStorage.getItem("dappPublicKey");
       const params = new URLSearchParams({
         dapp_encryption_public_key: dappPubKey,
         nonce: bs58.encode(nonce),
@@ -1126,7 +1127,7 @@ const Onboarding = () => {
           telegramId:
             teleId ||
             localStorage.getItem("telegramId") ||
-            window.Telegram?.WebApp?.initData,
+            window.Telegram?.WebApp?.initDataUnsafe?.user?.id,
           walletAddress: localStorage.getItem("walletAddress") || Address,
           depositAddress: depositAddress,
           WaletName: "metamask",
@@ -1827,7 +1828,7 @@ const Onboarding = () => {
       var obj = {
         address:
           telegramUser?.telegramId ||
-          window.Telegram?.WebApp?.initData ||
+          window.Telegram?.WebApp?.initDataUnsafe?.user?.id ||
           Address,
       };
       const resp = await postMethod({
@@ -2072,45 +2073,75 @@ const Onboarding = () => {
   //   clearInitialWalletState();
   // }, []);
 
+  // const walletData = [
+  //   {
+  //     id: 1,
+  //     img: obrd_middl_wllImg1,
+  //     heading: "MetaMask",
+  //     keys: "metamask",
+  //     description: "Popular Ethereum & EVM wallet for DeFi, NFTs, and dApps",
+  //     connectStatus: true,
+  //   },
+  //   // {
+  //   //   id: 2,
+  //   //   img: obrd_middl_wllImg2,
+  //   //   heading: "Coinbase Wallet",
+  //   //   keys: "coinbase",
+  //   //   description: "Secure self-custody wallet backed by Coinbase exchange",
+  //   // },
+  //   {
+  //     id: 3,
+  //     img: phantom,
+  //     heading: "Phantom",
+  //     keys: "phantom",
+  //     description:
+  //       "Leading Solana wallet for fast transactions, NFTs, and DeFi",
+  //   },
+  //   {
+  //     id: 3,
+  //     img: walletIMG,
+  //     heading: "Create Wallet",
+  //     keys: "newwallet",
+  //     description:
+  //       "Leading Solana wallet for fast transactions, NFTs, and DeFi",
+  //   },
+  //   // {
+  //   //   id: 4,
+  //   //   img: solsfare,
+  //   //   heading: "Solflare",
+  //   //   keys: "solflare",
+  //   //   description: "Secure Solana wallet with staking and hardware support",
+  //   // },
+  // ];
+
+  /* ── CHANGE-2: walletData — rename "Create Wallet" → "My Deposit Address", reorder ── Implemented ── END CHANGE-2 ── */
   const walletData = [
     {
       id: 1,
+      img: walletIMG,
+      heading: "My Deposit Address",
+      keys: "newwallet",
+      description:
+        "Your Arken-managed wallet on ARB & SOL — used for all on-chain activity",
+      isSystem: true,
+    },
+    {
+      id: 2,
       img: obrd_middl_wllImg1,
-      heading: "MetaMask",
+      heading: "MetaMask / EVM",
       keys: "metamask",
-      description: "Popular Ethereum & EVM wallet for DeFi, NFTs, and dApps",
+      description:
+        "Connect to deposit funds from your EVM wallet into your Arken address",
       connectStatus: true,
     },
-    // {
-    //   id: 2,
-    //   img: obrd_middl_wllImg2,
-    //   heading: "Coinbase Wallet",
-    //   keys: "coinbase",
-    //   description: "Secure self-custody wallet backed by Coinbase exchange",
-    // },
     {
       id: 3,
       img: phantom,
-      heading: "Phantom",
+      heading: "Phantom / Solana",
       keys: "phantom",
       description:
-        "Leading Solana wallet for fast transactions, NFTs, and DeFi",
+        "Connect to deposit funds from your Phantom wallet into your Arken address",
     },
-    {
-      id: 3,
-      img: walletIMG,
-      heading: "Create Wallet",
-      keys: "newwallet",
-      description:
-        "Leading Solana wallet for fast transactions, NFTs, and DeFi",
-    },
-    // {
-    //   id: 4,
-    //   img: solsfare,
-    //   heading: "Solflare",
-    //   keys: "solflare",
-    //   description: "Secure Solana wallet with staking and hardware support",
-    // },
   ];
 
   useEffect(() => {
@@ -2183,21 +2214,73 @@ const Onboarding = () => {
   const [selectNetwork, setSelectNetwork] = useState("");
   const [ChoosewalletStatus, setChoosewalletStatus] = useState(false);
   const [custodialWallets, setCustodialWallets] = useState([]);
+  const walletCreationAttempted = useRef(false);
 
+  /* ── CHANGE-1: resolvedTelegramId + activeChain/switchChain + bothWallets ── Implemented ── END CHANGE-1 ── */
+  const resolvedTelegramId = telegramUser?.telegramId || "5100502824";
+  const [activeChain, setActiveChain] = useState(
+    localStorage.getItem("activeChain") || "ARB",
+  );
+  const switchChain = (chain) => {
+    setActiveChain(chain);
+    localStorage.setItem("activeChain", chain);
+  };
+  const [bothWallets, setBothWallets] = useState({ arb: null, sol: null });
+
+  // const createNewWallet = async (key) => {
+  //   setwalletName(key);
+  //   localStorage.setItem("walletName", "newwallet");
+  //   setChoosewalletStatus(true);
+  // };
+
+  /* ── CHANGE-4: createNewWallet — wallets auto-created on mount; button just reconnects ── */
   const createNewWallet = async (key) => {
     setwalletName(key);
     localStorage.setItem("walletName", "newwallet");
-    setChoosewalletStatus(true);
+    if (custodialWallets.length > 0) {
+      // Wallets already in state — reconnect immediately
+      reconnectCustodialWallet();
+      return;
+    }
+    // Wallets not in state yet (user clicked before first poll returned)
+    // If auto-creation hasn't fired yet, trigger it; otherwise wait for poll
+    if (!walletCreationAttempted.current) {
+      walletCreationAttempted.current = true;
+      await createNewWalletFunc();
+    } else {
+      setWalletload(true); // show loading until poll returns with wallets
+    }
   };
 
   // Reconnects user to their existing custodial wallet(s) without creating a new one
-  const reconnectCustodialWallet = () => {
-    const firstWallet = custodialWallets[0];
-    if (!firstWallet) return;
+  // const reconnectCustodialWallet = () => {
+  //   const firstWallet = custodialWallets[0];
+  //   if (!firstWallet) return;
+  //   localStorage.setItem("walletName", "newwallet");
+  //   localStorage.setItem("walletAddress", firstWallet.address);
+  //   setwalletName("newwallet");
+  //   setAddress(firstWallet.address);
+  //   setWalletaccess(true);
+  // };
+
+  /* ── CHANGE-3: reconnectCustodialWallet — dual-chain, accepts direct wallet list ── */
+  const reconnectCustodialWallet = (walletsArg) => {
+    // Accept wallets directly (avoids stale state) or fall back to state
+    const wallets = walletsArg || custodialWallets;
+    if (!wallets.length) return;
+    const isARB = (w) => (w.network || "").toUpperCase().includes("ARB");
+    const isSOL = (w) => (w.network || "").toUpperCase().includes("SOL");
+    const arbWallet = wallets.find(isARB) || null;
+    const solWallet = wallets.find(isSOL) || null;
+    if (arbWallet || solWallet) setBothWallets({ arb: arbWallet, sol: solWallet });
+    const activeWallet =
+      wallets.find((w) => (w.network || "").toUpperCase() === activeChain) ||
+      wallets[0];
+    const addr = activeWallet?.address || activeWallet?.walletAddress || "";
     localStorage.setItem("walletName", "newwallet");
-    localStorage.setItem("walletAddress", firstWallet.address);
+    localStorage.setItem("walletAddress", addr);
     setwalletName("newwallet");
-    setAddress(firstWallet.address);
+    setAddress(addr);
     setWalletaccess(true);
   };
 
@@ -2328,37 +2411,71 @@ const Onboarding = () => {
     } catch (error) {}
   };
   const [walletLoad, setWalletload] = useState();
-  const createNewWalletFunc = async (data) => {
+  // const createNewWalletFunc = async (data) => {
+  //   try {
+  //     setWalletload(true);
+  //     const obj = {
+  //       network: data?.value || selectNetwork?.value,
+  //       telegramId: telegramUser?.telegramId || "5100502824",
+  //     };
+  //     localStorage.setItem("walletName", "newwallet");
+  //     localStorage.setItem(
+  //       "selectNetwork",
+  //       data?.value || selectNetwork?.value,
+  //     );
+  //     const resp = await postMethod({
+  //       apiUrl: apiService.createNewWallet,
+  //       payload: obj,
+  //     });
+  //     setWalletload(false);
+
+  //     if (resp.status) {
+  //       showSuccessToast(resp.message);
+  //       setwalletDetails(resp.data);
+  //       setAddress(resp.data.address);
+  //       localStorage.setItem("walletAddress", resp.data.address);
+  //       setwalletLoading(false);
+  //       setWalletaccess(true);
+  //       setChoosewalletStatus(false);
+  //       // console.log("MetaMask wallet linked");
+  //     } else {
+  //       showErrorToast(resp.message);
+  //       // alert(resp.message);
+  //     }
+  //   } catch (error) {}
+  // };
+
+  /* ── CHANGE-5: createNewWalletFunc — creates both ARB+SOL wallets ── */
+  const createNewWalletFunc = async () => {
     try {
       setWalletload(true);
-      const obj = {
-        network: data?.value || selectNetwork?.value,
-        telegramId: telegramUser?.telegramId || "5100502824",
-      };
       localStorage.setItem("walletName", "newwallet");
-      localStorage.setItem(
-        "selectNetwork",
-        data?.value || selectNetwork?.value,
-      );
-      const resp = await postMethod({
-        apiUrl: apiService.createNewWallet,
-        payload: obj,
-      });
+
+      // Call backend twice — one per chain (backward compatible with existing endpoint)
+      const [respARB, respSOL] = await Promise.all([
+        postMethod({ apiUrl: apiService.createNewWallet, payload: { network: "ARB", telegramId: resolvedTelegramId } }),
+        postMethod({ apiUrl: apiService.createNewWallet, payload: { network: "SOL", telegramId: resolvedTelegramId } }),
+      ]);
+
       setWalletload(false);
 
-      if (resp.status) {
-        showSuccessToast(resp.message);
-        setwalletDetails(resp.data);
-        setAddress(resp.data.address);
-        localStorage.setItem("walletAddress", resp.data.address);
-        setwalletLoading(false);
-        setWalletaccess(true);
-        setChoosewalletStatus(false);
-        // console.log("MetaMask wallet linked");
-      } else {
-        showErrorToast(resp.message);
-        // alert(resp.message);
+      const arb = respARB.status ? respARB.data : null;
+      const sol = respSOL.status ? respSOL.data : null;
+
+      if (!arb && !sol) {
+        showErrorToast(respARB.message || respSOL.message || "Wallet creation failed");
+        return;
       }
+
+      setBothWallets({ arb, sol });
+      const defaultAddr = arb?.address || sol?.address;
+      setAddress(defaultAddr || "");
+      localStorage.setItem("walletAddress", defaultAddr || "");
+      localStorage.setItem("activeChain", "ARB");
+      setwalletLoading(false);
+      setWalletaccess(true);
+      setChoosewalletStatus(false);
+      showSuccessToast("Wallet created successfully");
     } catch (error) {}
   };
 
@@ -3741,14 +3858,26 @@ const Onboarding = () => {
               {/* Reconnect to existing custodial wallet — shown when user has a previously created wallet */}
               {custodialWallets.length > 0 && !walletaccess && (
                 <div style={{ marginBottom: 16 }}>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginBottom: 8, textAlign: "center" }}>
+                  <p
+                    style={{
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.5)",
+                      marginBottom: 8,
+                      textAlign: "center",
+                    }}
+                  >
                     You have an existing wallet
                   </p>
                   {custodialWallets.map((w, i) => (
                     <div
                       key={i}
                       className="obrd_wllet_itm"
-                      style={{ ...pageStyle.obrd_wllet_itm, borderColor: "rgba(99,102,241,0.5)", background: "rgba(99,102,241,0.08)", marginBottom: 8 }}
+                      style={{
+                        ...pageStyle.obrd_wllet_itm,
+                        borderColor: "rgba(99,102,241,0.5)",
+                        background: "rgba(99,102,241,0.08)",
+                        marginBottom: 8,
+                      }}
                       onClick={reconnectCustodialWallet}
                     >
                       <ImageComponent
@@ -3760,14 +3889,24 @@ const Onboarding = () => {
                         <h6 style={pageStyle.obrd_wllet_head}>
                           My {w.network} Wallet
                         </h6>
-                        <p style={{ ...pageStyle.obrd_wllet_para, fontSize: 11 }}>
+                        <p
+                          style={{ ...pageStyle.obrd_wllet_para, fontSize: 11 }}
+                        >
                           {w.address.slice(0, 8)}...{w.address.slice(-6)}
                         </p>
                       </div>
                       <GoArrowRight style={pageStyle.obrd_wllet_icon} />
                     </div>
                   ))}
-                  <div style={{ textAlign: "center", fontSize: 11, color: "rgba(255,255,255,0.3)", marginTop: 8, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      textAlign: "center",
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.3)",
+                      marginTop: 8,
+                      marginBottom: 4,
+                    }}
+                  >
                     — or connect a different wallet —
                   </div>
                 </div>
@@ -3862,6 +4001,38 @@ const Onboarding = () => {
 
               {!loadingwallet && (
                 <>
+                  {/* Chain toggle — shown after managed wallet connects */}
+                  {walletName === "newwallet" && walletaccess && (bothWallets.arb || bothWallets.sol) && (
+                    <div style={{ display: "flex", gap: 8, margin: "12px 0", width: "100%" }}>
+                      {["ARB", "SOL"].map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            switchChain(c);
+                            const w = bothWallets?.[c.toLowerCase()];
+                            if (w?.address) {
+                              setAddress(w.address);
+                              localStorage.setItem("walletAddress", w.address);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "10px 0",
+                            borderRadius: 8,
+                            border: "none",
+                            cursor: "pointer",
+                            background: activeChain === c ? "#6366f1" : "rgba(255,255,255,0.08)",
+                            color: "#fff",
+                            fontWeight: activeChain === c ? 700 : 400,
+                            fontSize: 13,
+                          }}
+                        >
+                          {c === "ARB" ? "Arbitrum (ARB)" : "Solana (SOL)"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {((Address && walletaccess) || userWallet.isConnected) && (
                     <button
                       className="onbord_subtbtn"
@@ -3928,6 +4099,50 @@ const Onboarding = () => {
                     <p style={pageStyle.obrd_middl_tppara}>
                       Add funds to start trading predictions
                     </p>
+
+                    {/* ── CHANGE-6: chain toggle + QR for deposit address ── Implemented ── END CHANGE-6 ── */}
+                    <h5 style={pageStyle.obrd_middl_tphead}>
+                      Your Deposit Address
+                    </h5>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        marginBottom: 16,
+                        width: "100%",
+                      }}
+                    >
+                      {["ARB", "SOL"].map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => {
+                            switchChain(c);
+                            const w = bothWallets?.[c.toLowerCase()];
+                            if (w?.address) {
+                              setAddress(w.address);
+                              localStorage.setItem("walletAddress", w.address);
+                            }
+                          }}
+                          style={{
+                            flex: 1,
+                            padding: "10px 0",
+                            borderRadius: 8,
+                            border: "none",
+                            cursor: "pointer",
+                            background:
+                              activeChain === c
+                                ? "#6366f1"
+                                : "rgba(255,255,255,0.08)",
+                            color: "#fff",
+                            fontWeight: activeChain === c ? 700 : 400,
+                            fontSize: 13,
+                          }}
+                        >
+                          {c === "ARB" ? "Arbitrum (ARB)" : "Solana (SOL)"}
+                        </button>
+                      ))}
+                    </div>
+
                     <ImageComponent
                       styles={pageStyle.obrd_middl_tpImg}
                       // imgPic={`https://quickchart.io/chart?chs=168x168&chld=M|0&cht=qr&chl=${Address}`}
@@ -4250,7 +4465,7 @@ const Onboarding = () => {
           {/* <button onClick={sendusdcfn}>sendusdc</button> */}
         </div>
       </div>
-      <Modal
+      {/* <Modal
         open={ChoosewalletStatus}
         onClose={() => setChoosewalletStatus(false)}
         aria-labelledby="modal-modal-title"
@@ -4284,7 +4499,10 @@ const Onboarding = () => {
             <div className="mt-2 text-sm text-gray-400">Creating wallet...</div>
           )}
         </Box>
-      </Modal>
+      </Modal> */}
+      {/* ── CHANGE-7: Network chooser modal removal — system now auto-creates both ARB+SOL wallets ── implemented
+      Replace the Modal above with: nothing (remove it entirely when uncommenting CHANGE-5)
+      ── END CHANGE-7 ── */}
       <Modal
         open={false}
         onClose={() => setshowOtpBox(false)}

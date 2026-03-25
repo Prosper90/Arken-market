@@ -11,6 +11,9 @@ const AdminWalletHistory = require("./models/AdminWalletHistory");
 const Market = require("./models/markets");
 const { callDelphi, callLex } = require("./services/oracle.service");
 const { settleUMAAssertion } = require("./services/uma.service");
+const arkenEvm = require("./services/arken.evm.service");
+const arkenSolana = require("./services/arken.solana.service");
+const common = require("./utils/common");
 
 // cron.schedule("0 0 * * *", async () => {
 
@@ -295,6 +298,32 @@ cron.schedule("0 0 * * *", async () => {
               }
             }
           );
+
+          // For Arken EVM / Solana markets: trigger on-chain claimWinnings from user's custodial wallet
+          if (isWinner) {
+            const arkenMarket = await Market.findById(prediction.marketId).lean();
+            const walletDoc = await userPublicWallet.findOne({ telegramId: prediction.telegramId });
+
+            if (arkenMarket?.arkenMarketAddress) {
+              const arbWallet = walletDoc?.wallets?.find(w => w.network === 'ARB' || w.network === 'EVM');
+              if (arbWallet?.privateKey) {
+                arkenEvm.claimWinnings({
+                  privateKey: common.decrypt(arbWallet.privateKey),
+                  marketAddress: arkenMarket.arkenMarketAddress,
+                }).catch(err => console.error(`[ArkenEVM] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
+              }
+            }
+
+            if (arkenMarket?.solanaMarketId && arkenSolana.isDeployed()) {
+              const solWallet = walletDoc?.wallets?.find(w => w.network === 'SOL');
+              if (solWallet?.privateKey) {
+                arkenSolana.claimWinnings({
+                  privateKey: common.decrypt(solWallet.privateKey),
+                  mongodbId: arkenMarket.solanaMarketId,
+                }).catch(err => console.error(`[ArkenSolana] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
+              }
+            }
+          }
         }
 
         // NOTE: Group owner commission and referral fees are now collected at bet placement time,

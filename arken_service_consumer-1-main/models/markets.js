@@ -55,6 +55,7 @@ const marketSchema = new mongoose.Schema(
 
     // Creator tracking (for revenue share)
     creatorTelegramId: { type: Number, default: null },
+    creatorOutcomeIndex: { type: Number, default: 0 },
 
     // Oracle type for resolution
     oracleType: {
@@ -107,6 +108,41 @@ const marketSchema = new mongoose.Schema(
       status: { type: String, default: null },
       overriddenTo: { type: String, default: null },
       resolvedAt: { type: Date, default: null },
+    },
+
+    // Which blockchain this market is deployed on
+    chain: {
+      type: String,
+      enum: ["EVM", "SOL"],
+      default: "EVM",
+      index: true,
+    },
+
+    // Per-user LP positions for the Active tab
+    lpProviders: [
+      {
+        telegramId: { type: Number },
+        amount: { type: Number },
+        addedAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // On-chain identifiers
+    source: {
+      type: String,
+      enum: ["manual", "poly", "arken", "solana"],
+      default: "manual",
+      index: true,
+    },
+    arkenMarketAddress: {
+      type: String,
+      default: null,
+      index: true,
+    },
+    solanaMarketId: {
+      type: String,
+      default: null,
+      index: true,
     },
   },
   {

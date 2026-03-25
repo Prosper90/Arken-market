@@ -73,8 +73,17 @@ const [initDatanew, setinitData] = useState(null);
 
 
   useEffect(() => {
-  authenticateTelegramUser();
-}, []);
+    // /clear_cache command: wipe localStorage and reload without the param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("clear") === "1") {
+      localStorage.clear();
+      params.delete("clear");
+      params.delete("t");
+      const newSearch = params.toString();
+      window.history.replaceState({}, "", newSearch ? `?${newSearch}` : window.location.pathname);
+    }
+    authenticateTelegramUser();
+  }, []);
 
 
 //   const authenticateTelegramUser = async () => {
@@ -140,15 +149,46 @@ const authenticateTelegramUser = async () => {
     if (resp.success) {
       setTelegramUser(resp.data);
       localStorage.setItem("telegramUser", JSON.stringify(resp.data));
-      console.log("Telegram user authenticated:", resp.data);
-      // If wallet already connected, skip onboarding entirely
+
+      // Validate that the stored wallet session still exists in DB
       const savedWallet = localStorage.getItem("walletAddress");
+      const savedWalletName = localStorage.getItem("walletName");
       if (savedWallet) {
-        Navigation("/markets");
-        return;
+        const userResp = await postMethod({
+          apiUrl: apiService.getUserDetails,
+          payload: { telegramId: resp.data.telegramId },
+        });
+        const hasCustodialWallet =
+          savedWalletName === "newwallet" &&
+          userResp.success &&
+          userResp.data?.custodialWallets?.length > 0;
+        const hasExternalWallet =
+          userResp.success &&
+          userResp.data?.wallet?.isConnected &&
+          userResp.data?.wallet?.walletAddress;
+        if (hasCustodialWallet || hasExternalWallet) {
+          // Restore active wallet address from custodial wallets if needed
+          if (hasCustodialWallet && !hasExternalWallet) {
+            const custodialWallets = userResp.data.custodialWallets;
+            const activeChain = localStorage.getItem("activeChain") || "ARB";
+            const activeWallet =
+              custodialWallets.find((w) => (w.network || "").toUpperCase() === activeChain) ||
+              custodialWallets[0];
+            if (activeWallet?.address) {
+              localStorage.setItem("walletAddress", activeWallet.address);
+            }
+          }
+          Navigation("/markets");
+          return;
+        } else {
+          // Stale localStorage — wallet was deleted from DB, clear and re-onboard
+          localStorage.removeItem("walletAddress");
+          localStorage.removeItem("walletName");
+        }
       }
     } else {
       console.error(resp.message);
+      toast.error(resp.message || "Authentication failed. Please restart the app.");
     }
   } catch (error) {
     console.error("Telegram auth error:", error);

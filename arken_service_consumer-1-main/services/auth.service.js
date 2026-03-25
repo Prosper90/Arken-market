@@ -1,4 +1,6 @@
 const common = require("../utils/common");
+const arkenEvm = require("./arken.evm.service");
+const arkenSolana = require("./arken.solana.service");
 var adminDB = require("../models/admin");
 var adminloginhistoryDB = require("../models/adminloginhistory");
 var mailtempDB = require("../models/mailtemplate");
@@ -50,11 +52,12 @@ const {
   TOKEN_PROGRAM_ID,
   getAccount
 } = require("@solana/spl-token");
+// Read from env — allows switching between testnet (Sepolia) and mainnet (Arbitrum)
 const USDC_CONTRACT =
-  "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
+  process.env.USDT_ADDRESS || "0xaf88d065e77c8cc2239327c5edb3a432268e5831";
 const CHAIN_IDS = {
   ETH: 1,
-  ARB: 42161,
+  ARB: parseInt(process.env.ARB_CHAIN_ID || "42161"),
   POLY: 137,
 };
 // const  Keypair = require("@solana/web3.js");
@@ -89,7 +92,7 @@ const ERC20_ABI = [
 const PROVIDERS = {
   // ETH: new ethers.JsonRpcProvider("YOUR_ETH_RPC_URL"),
   ARB: new ethers.JsonRpcProvider(ARB_RPC),
-  SOL: new Connection("https://api.mainnet-beta.solana.com", "confirmed"),
+  SOL: new Connection(process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com", "confirmed"),
 };
 
 const CURRENCY_CONFIG = {
@@ -1501,7 +1504,9 @@ async function getMergedMarketsHandler(data) {
 
     let sortQuery = { startDate: -1 };
 
-    if (category === "Manual") {
+    const sourceFilter = data?.source || null;
+
+    if (category === "Manual" || sourceFilter === "arken") {
       manualOnly = true;
     }
 
@@ -1540,6 +1545,11 @@ async function getMergedMarketsHandler(data) {
       categoryQuery = { category };
     }
 
+    let sourceQuery = {};
+    if (sourceFilter) {
+      sourceQuery = { source: sourceFilter };
+    }
+
     if (subcategory && subcategory !== "All") {
       subcategoryQuery = { subcategory };
     }
@@ -1575,6 +1585,7 @@ async function getMergedMarketsHandler(data) {
         ...subcategoryQuery,
         ...newQuery,
         ...searchQuery,
+        ...sourceQuery,
       };
 
       if (timeFilter) {
@@ -1588,7 +1599,7 @@ async function getMergedMarketsHandler(data) {
 
       taggedManualMarkets = manualMarkets.map((item) => ({
         ...item,
-        source: "manual",
+        source: item.source || "manual",
         closed: false,
       }));
     }
@@ -1792,7 +1803,14 @@ async function getMergedMarketByIdHandler(data) {
           specifyId: market.specifyId,
           acceptingOrders: market.acceptingOrders,
           events: market.events,
-          source: "manual",
+          source: market.source || "manual",
+          marketStatus: market.marketStatus,
+          arkenMarketAddress: market.arkenMarketAddress || null,
+          solanaMarketId: market.solanaMarketId || null,
+          chain: market.chain || "EVM",
+          creatorTelegramId: market.creatorTelegramId || null,
+          oracleType: market.oracleType || "manual",
+          isPrivate: market.isPrivate || false,
           createdAt: market.createdAt,
         },
       };
@@ -2426,6 +2444,8 @@ async function userbetplaceHandler(data) {
       odds,
       currency,
       source = "manual",
+      arkenMarketAddress,
+      solanaMarketId,
     } = data;
 
     console.log("amount",amount);
@@ -2470,6 +2490,100 @@ async function userbetplaceHandler(data) {
     if (!user) {
       return { success: false, code: 404, message: "User not found" };
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PATH A — Arken EVM on-chain bet (buyOption on ArkenMarket)
+    // ═══════════════════════════════════════════════════════════════
+    if (source === "arken" && arkenMarketAddress) {
+      const amountNum = Number(amount);
+      if (!amountNum || amountNum <= 0) {
+        return { success: false, code: 400, message: "Invalid bet amount" };
+      }
+
+      // 1. Quick MongoDB balance gate
+      const { balance: mongoBalance } = await getBalance(telegramId);
+      if (mongoBalance < amountNum) {
+        return {
+          success: false,
+          code: 400,
+          message: `Insufficient balance. You have $${mongoBalance.toFixed(2)}, need $${amountNum}`,
+        };
+      }
+
+      // 2. Get user's custodial wallet for the right chain
+      //    Market chain is derived from source: "arken" = EVM/ARB, "solana" = SOL
+      const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+      const arbWallet = custodialDoc?.wallets?.find(
+        (w) => (w.network || "").toUpperCase().includes("ARB")
+      );
+      if (!arbWallet?.privateKey || !arbWallet?.address) {
+        return { success: false, message: "No ARB custodial wallet found for this user" };
+      }
+
+      const userPrivateKey = common.decrypt(arbWallet.privateKey);
+
+      // 3. On-chain balance verification (security check)
+      const onChainBalance = await arkenEvm.getUsdtBalance(arbWallet.address);
+      if (onChainBalance < amountNum) {
+        return {
+          success: false,
+          message: `Insufficient on-chain USDT. Wallet holds $${onChainBalance.toFixed(2)}, need $${amountNum}`,
+        };
+      }
+
+      // 4. Place bet on-chain — calls buyOption(optionIndex, amount) on ArkenMarket
+      console.log(`[placeBet] User ${telegramId} betting $${amountNum} on option ${outcomeIndex} in market ${arkenMarketAddress}`);
+      const { txHash, walletAddress } = await arkenEvm.placeBet({
+        privateKey: userPrivateKey,
+        marketAddress: arkenMarketAddress,
+        optionIndex: Number(outcomeIndex),
+        amountUsdt: amountNum,
+      });
+      console.log(`[placeBet] On-chain success. TxHash: ${txHash}`);
+
+      // 5. On-chain confirmed — now deduct MongoDB balance
+      await UserPublicWallet.updateOne(
+        { telegramId: String(telegramId) },
+        { $inc: { balance: -amountNum } }
+      );
+
+      // 6. Create prediction record
+      const shares = amountNum / (Number(odds) || 1);
+      const prediction = await Prediction.create({
+        userId: user._id,
+        telegramId,
+        groupId,
+        chatType,
+        manualId: manualId || null,
+        outcomeIndex: Number(outcomeIndex),
+        outcomeLabel,
+        amount: amountNum,
+        odds: Number(odds) || 1,
+        shares,
+        avgPrice: Number(odds) || 1,
+        currentPrice: Number(odds) || 1,
+        potentialPayout: shares,
+        potentialProfit: shares - amountNum,
+        currency: "USDT",
+        deductedFrom: "userPublicWallet",
+        status: "OPEN",
+        source: "arken",
+        evmTxHash: txHash,
+      });
+
+      user.totalPredictions += 1;
+      await user.save();
+
+      return {
+        success: true,
+        data: { ...prediction.toObject(), evmTxHash: txHash },
+        message: "Bet placed on-chain successfully",
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PATH B — Custodial bet (poly, manual off-chain)
+    // ═══════════════════════════════════════════════════════════════
 
     // --- Fee calculation ---
     const feeSettings = await PlatformFeeSettings.findOne({ status: true });
@@ -2740,15 +2854,43 @@ async function getActiveBetsForUserHandler(data) {
 
     const finalData = activeBets.map((bet) => ({
       ...bet,
+      type: "bet",
       question:
         bet.source === "poly"
           ? bet.question || polyMarketMap[bet.marketId] || ""
           : manualMarketMap[bet.manualId?.toString()] || "",
     }));
 
+    // Fetch LP positions for this user
+    const lpMarkets = await Market.find({
+      "lpProviders.telegramId": Number(telegramId),
+      marketStatus: { $in: ["active", "pending"] },
+    })
+      .select("question marketStatus source lpProviders endDate")
+      .lean();
+
+    const lpItems = lpMarkets.flatMap((m) =>
+      m.lpProviders
+        .filter((lp) => lp.telegramId === Number(telegramId))
+        .map((lp) => ({
+          type: "lp",
+          _id: `${m._id}_lp_${lp.addedAt}`,
+          question: m.question,
+          marketId: m._id,
+          amount: lp.amount,
+          status: m.marketStatus.toUpperCase(),
+          outcomeLabel: "Liquidity Provider",
+          createdAt: lp.addedAt,
+          endDate: m.endDate,
+          source: m.source,
+          potentialPayout: 0,
+          unrealizedPnl: 0,
+        }))
+    );
+
     return {
       success: true,
-      data: finalData,
+      data: [...finalData, ...lpItems],
       message: "Active bets fetched successfully",
     };
   } catch (error) {
@@ -2894,6 +3036,14 @@ async function getAddress(data) {
     const getwallet = await userWallet.findOne({ telegramId: telegramId });
     console.log(getwallet, "getwallet");
 
+    if (!getwallet) {
+      return {
+        success: false,
+        code: 200,
+        message: "Missing telegram Id",
+      };
+    }
+
     const response = getwallet.wallets.map((w) => ({
       currencyName: w.currencyName,
       currencySymbol: w.currencySymbol,
@@ -2940,6 +3090,13 @@ async function usertelegramId(data) {
         (await usersDB.findOne({ walletAddress: address })) ||
         (await usersDB.findOne({ telegramId: address }));
       console.log(user, "==============");
+      if (!user) {
+        return {
+          success: false,
+          code: 404,
+          message: "User not found",
+        };
+      }
       return {
         success: true,
         code: 200,
@@ -3505,7 +3662,7 @@ async function userWithdrawHandler(data) {
       // const toPublicKey = new PublicKey(data.Address);
 
       const connection = new Connection(
-        "https://api.mainnet-beta.solana.com",
+        process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com",
         "confirmed",
       );
 
@@ -4509,7 +4666,9 @@ async function getConnectionWithFallback() {
   const rpcs = [
     process.env.SOL_RPC_URL,
     process.env.SOL_RPC_URL2,
-  ];
+    process.env.SOLANA_RPC_URL,  // fallback to the unified env var
+    "https://api.testnet.solana.com",
+  ].filter(Boolean);
 
   for (const rpc of rpcs) {
     try {
@@ -4534,15 +4693,13 @@ async function getSolanaTransactions(address) {
     console.log(address,"address");
     const connection = await getConnectionWithFallback();
     const pubKey = new PublicKey(address);
-  //  const USDC_MINT =
-  //         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
-const USDC_MINT = new PublicKey(
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-);
+    // Use env-configured USDC mint — supports both testnet custom mint and mainnet
+    const USDC_MINT_ADDRESS = process.env.SOLANA_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+    const USDC_MINT = new PublicKey(USDC_MINT_ADDRESS);
     const ata = await getAssociatedTokenAddress(
-  USDC_MINT,
-  pubKey
-);
+      USDC_MINT,
+      pubKey
+    );
 const signatures = await connection.getSignaturesForAddress(
   ata,
   { limit: 500 }
@@ -4574,7 +4731,7 @@ const signatures = await connection.getSignaturesForAddress(
         const post = tx.meta.postTokenBalances || [];
 
         const USDC_MINT =
-          "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+          process.env.SOLANA_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 
         let amount = 0;
         let from = "";
@@ -4762,26 +4919,18 @@ async function getEVMTransactions(address, network) {
     if (data.status !== "1") {
       return [];
     }
-  console.log(data.result.map(tx => ({
-      hash: tx.hash,
-      from: tx.from,
-      to: tx.to,
-      amount: Number(tx.value) / 10 ** tx.tokenDecimal,
-      symbol: tx.tokenSymbol,
-      blockNumber: Number(tx.blockNumber),
-      timestamp: Number(tx.timeStamp),
-      confirmations: Number(tx.confirmations),
-    })),"------------------")
-    return data.result.map(tx => ({
-      hash: tx.hash,
-      from: tx.from,
-      to: tx.to,
-      amount: Number(tx.value) / 10 ** tx.tokenDecimal,
-      symbol: tx.tokenSymbol,
-      blockNumber: Number(tx.blockNumber),
-      timestamp: Number(tx.timeStamp),
-      confirmations: Number(tx.confirmations),
-    }));
+    return data.result
+      .filter(tx => tx.to.toLowerCase() === address.toLowerCase())
+      .map(tx => ({
+        hash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        amount: Number(tx.value) / 10 ** tx.tokenDecimal,
+        symbol: tx.tokenSymbol,
+        blockNumber: Number(tx.blockNumber),
+        timestamp: Number(tx.timeStamp),
+        confirmations: Number(tx.confirmations),
+      }));
 
   } catch (error) {
     console.error("EVM tx fetch error:", error.message);
@@ -5898,7 +6047,7 @@ function generateInviteCode() {
 async function createUserMarketHandler(data) {
   try {
     const { question, outcomes, endDate, startDate, isPrivate, oracleType, telegramId,
-            tags, initialLiquidity, probabilities } = data;
+            tags, initialLiquidity, probabilities, chain } = data;
 
     if (!telegramId) return { status: false, message: "Telegram ID required" };
     if (!question || question.length < 10 || question.length > 150) {
@@ -5911,6 +6060,8 @@ async function createUserMarketHandler(data) {
       return { status: false, message: "End date must be in the future" };
     }
 
+    const targetChain = chain === "SOL" ? "SOL" : "EVM";
+
     let inviteCode = null;
     let inviteLink = null;
     if (isPrivate) {
@@ -5921,26 +6072,22 @@ async function createUserMarketHandler(data) {
         : null;
     }
 
-    // Deduct initial liquidity + $1 oracle fee from user's wallet.
-    // The oracle fee is charged on every market creation regardless of liquidity.
-    const ORACLE_FEE = 1;
+    // ── Balance check & deduction ────────────────────────────────────────────
+    const ORACLE_FEE = oracleType === "uma" ? 1 : 0;
     const liquidityAmount = Number(initialLiquidity) || 0;
     const totalDeduction = liquidityAmount + ORACLE_FEE;
+    console.log(`[createMarket] oracleType=${oracleType} liquidityAmount=${liquidityAmount} ORACLE_FEE=${ORACLE_FEE} totalDeduction=${totalDeduction}`);
 
     const { balance: userBalance } = await getBalance(telegramId);
     if (userBalance < totalDeduction) {
       return {
         status: false,
-        message: `Insufficient balance. You need at least $${totalDeduction} (${liquidityAmount > 0 ? `$${liquidityAmount} liquidity + ` : ""}$${ORACLE_FEE} oracle fee). You have $${userBalance.toFixed(2)}.`,
+        message: `Insufficient balance. You need $${totalDeduction} ($${liquidityAmount} liquidity + $${ORACLE_FEE} oracle fee). You have $${userBalance.toFixed(2)}.`,
       };
     }
-    await UserPublicWallet.updateOne(
-      { telegramId: String(telegramId) },
-      { $inc: { balance: -totalDeduction } }
-    );
 
+    // ── Build default probabilities ──────────────────────────────────────────
     const outcomeCount = outcomes.length;
-    // Apply 3% house spread — binary starts 51.5/48.5, N-way tilts first outcome up
     const defaultProbs = (() => {
       const spread = 3;
       const base = parseFloat((100 / outcomeCount).toFixed(1));
@@ -5952,6 +6099,8 @@ async function createUserMarketHandler(data) {
       if (drift !== 0) p[outcomeCount - 1] = parseFloat((p[outcomeCount - 1] + drift).toFixed(1));
       return p;
     })();
+
+    // ── Save market to DB (initially chain_pending until contract deploys) ───
     const market = await Market.create({
       question,
       outcomes,
@@ -5964,19 +6113,165 @@ async function createUserMarketHandler(data) {
       active: false,
       inviteCode,
       tags: Array.isArray(tags) ? tags : [],
-      liquidity: Number(initialLiquidity) || 0,
+      liquidity: liquidityAmount,
+      chain: targetChain,
+      source: targetChain === "SOL" ? "solana" : "arken",
       chancePercents: Array.isArray(probabilities) && probabilities.length === outcomeCount
         ? probabilities
         : defaultProbs,
     });
 
-    return {
-      status: true,
-      success: true,
-      market,
-      inviteCode,
-      inviteLink,
-    };
+    // ── Deploy on-chain — user's custodial key is the signer ────────────────
+    if (targetChain === "EVM") {
+      if (!process.env.ARKEN_FACTORY_ADDRESS) {
+        console.warn("[createMarket] ARKEN_FACTORY_ADDRESS not set — market saved without chain deploy");
+        return { status: true, success: true, market, inviteCode, inviteLink };
+      }
+
+      // Fetch user's custodial ARB wallet private key
+      const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+      const arbWallet = custodialDoc?.wallets?.find(
+        (w) => (w.network || "").toUpperCase().includes("ARB")
+      );
+      if (!arbWallet?.privateKey) {
+        await Market.deleteOne({ _id: market._id });
+        return { status: false, message: "No ARB custodial wallet found for this user." };
+      }
+
+      try {
+        const userPrivateKey = common.decrypt(arbWallet.privateKey);
+        const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+
+        // Step 1: User's key calls the factory — they are the on-chain creator
+        console.log(`[createMarket] Deploying EVM market for ${market._id} (user signer)...`);
+        const { txHash, marketAddress } = await arkenEvm.createMarket({
+          adminPrivateKey: userPrivateKey,
+          mongodbId: market._id.toString(),
+          endTimestamp,
+          outcomeCount,
+        });
+        console.log(`[createMarket] Deployed at ${marketAddress} (tx: ${txHash})`);
+
+        // Step 2: User's key approves USDT and seeds liquidity into their own market
+        let liquidityTxHash = null;
+        if (liquidityAmount > 0) {
+          console.log(`[createMarket] Seeding ${liquidityAmount} USDT from user's ARB wallet...`);
+          const liq = await arkenEvm.seedLiquidity({
+            adminPrivateKey: userPrivateKey,
+            marketAddress,
+            amountUsdt: liquidityAmount,
+          });
+          liquidityTxHash = liq.txHash;
+          console.log(`[createMarket] Liquidity seeded (tx: ${liquidityTxHash})`);
+        }
+
+        // Step 3: Deduct internal balance — chain succeeded
+        console.log(`[createMarket] Deducting $${totalDeduction} from balance for user ${telegramId}`);
+        const balanceUpdate = await UserPublicWallet.updateOne(
+          { telegramId: String(telegramId) },
+          { $inc: { balance: -totalDeduction } }
+        );
+        if (balanceUpdate.modifiedCount === 0) {
+          // updateOne matched nothing — telegramId mismatch or doc missing.
+          // Balance could not be deducted but chain already spent funds.
+          console.error(`[createMarket] ⚠️  balance deduction found 0 docs for telegramId="${telegramId}" — manual correction needed`);
+        } else {
+          console.log(`[createMarket] Balance deducted successfully (modifiedCount=${balanceUpdate.modifiedCount})`);
+        }
+
+        // Step 4: Mark market as live
+        console.log(`[createMarket] Activating market ${market._id}...`);
+        await Market.updateOne(
+          { _id: market._id },
+          {
+            $set: {
+              arkenMarketAddress: marketAddress,
+              marketStatus: "active",
+              active: true,
+            },
+          }
+        );
+        console.log(`[createMarket] Market activated — arkenMarketAddress=${marketAddress}`);
+
+        return {
+          status: true,
+          success: true,
+          market: { ...market.toObject(), arkenMarketAddress: marketAddress, active: true },
+          inviteCode,
+          inviteLink,
+          txHash,
+          marketAddress,
+        };
+      } catch (chainErr) {
+        console.error("[createMarket] Chain deployment failed:", chainErr.message);
+        // Balance was never debited — just clean up the pending market record
+        await Market.deleteOne({ _id: market._id });
+        return {
+          status: false,
+          message: `Market creation failed: ${chainErr.message}`,
+        };
+      }
+    }
+
+    // ── SOL path ─────────────────────────────────────────────────────────────
+    if (!arkenSolana.isDeployed()) {
+      console.warn("[createMarket] ARKEN_PROGRAM_ID not set — SOL market saved without chain deploy");
+      return { status: true, success: true, market, inviteCode, inviteLink };
+    }
+
+    try {
+      const adminPrivateKey = process.env.SOLFLARE_PRIVATE_KEY;
+      if (!adminPrivateKey) {
+        await Market.deleteOne({ _id: market._id });
+        return { status: false, message: "SOLFLARE_PRIVATE_KEY not set — cannot deploy Solana market." };
+      }
+
+      const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+      console.log(`[createMarket] Deploying SOL market for ${market._id}...`);
+
+      const solResult = await arkenSolana.createMarket({
+        adminPrivateKey,
+        mongodbId: market._id.toString(),
+        endTimestamp,
+        outcomeCount,
+      });
+
+      if (!solResult) throw new Error("createMarket returned null — check ARKEN_PROGRAM_ID");
+
+      const { txHash, marketPda } = solResult;
+      console.log(`[createMarket] SOL market deployed. PDA=${marketPda} tx=${txHash}`);
+
+      // Deduct internal balance
+      const balanceUpdate = await UserPublicWallet.updateOne(
+        { telegramId: String(telegramId) },
+        { $inc: { balance: -totalDeduction } }
+      );
+      if (balanceUpdate.modifiedCount === 0) {
+        console.error(`[createMarket] ⚠️  SOL balance deduction found 0 docs for telegramId="${telegramId}"`);
+      }
+
+      // Mark market live
+      await Market.updateOne(
+        { _id: market._id },
+        { $set: { arkenMarketAddress: marketPda, marketStatus: "active", active: true } }
+      );
+      console.log(`[createMarket] SOL market activated — PDA=${marketPda}`);
+
+      return {
+        status: true,
+        success: true,
+        market: { ...market.toObject(), arkenMarketAddress: marketPda, active: true },
+        inviteCode,
+        inviteLink,
+        txHash,
+        marketAddress: marketPda,
+      };
+    } catch (chainErr) {
+      console.error("[createMarket] SOL chain deployment failed:", chainErr.message);
+      await Market.deleteOne({ _id: market._id });
+      return { status: false, message: `SOL market creation failed: ${chainErr.message}` };
+    }
+
   } catch (error) {
     console.error("createUserMarketHandler error:", error);
     return { status: false, message: "Something went wrong" };
@@ -6259,10 +6554,7 @@ async function getUserMarketsHandler(data) {
     const { telegramId } = data;
     if (!telegramId) return { success: false, message: "Missing telegramId" };
     const userMarkets = await Market.find({
-      $or: [
-        { creatorTelegramId: String(telegramId) },
-        { allowedTelegramIds: telegramId, isPrivate: true },
-      ],
+      creatorTelegramId: String(telegramId),
     })
       .sort({ createdAt: -1 })
       .lean();
@@ -6270,6 +6562,84 @@ async function getUserMarketsHandler(data) {
   } catch (error) {
     console.error("getUserMarketsHandler error:", error);
     return { success: false, message: "Something went wrong" };
+  }
+}
+
+async function sweepUserDepositsHandler(data) {
+  const { telegramId } = data;
+  if (!telegramId) return { success: false, message: "telegramId required" };
+
+  try {
+    const userDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) })
+      .select("telegramId wallets")
+      .lean();
+
+    if (!userDoc || !userDoc.wallets?.length) {
+      return { success: true, newDeposits: 0, message: "No wallets found" };
+    }
+
+    let totalNewDeposits = 0;
+
+    for (const wallet of userDoc.wallets) {
+      const { address, network } = wallet;
+      if (!address) continue;
+
+      let transactions = [];
+      if (network === "SOL") {
+        transactions = await getSolanaTransactions(address);
+      } else if (network === "ETH" || network === "ARB" || network === "EVM") {
+        transactions = await getEVMTransactions(address, network);
+      }
+
+      const newTxs = [];
+      for (const tx of transactions) {
+        if (await isTransactionProcessed(tx.hash)) continue;
+        const amount = parseFloat(tx.amount || tx.value);
+        if (amount <= 0) continue;
+        newTxs.push({ tx, amount });
+      }
+
+      if (!newTxs.length) continue;
+
+      const currency = CURRENCY_CONFIG[network] || CURRENCY_CONFIG.ETH;
+      const inserts = newTxs.map(({ tx, amount }) => ({
+        telegramId: String(telegramId),
+        Address: address,
+        walletName: `${network} Wallet`,
+        currencyId: network,
+        currencySymbol: currency.symbol,
+        currencyImage: currency.image,
+        currencyName: currency.name,
+        status: "COMPLETE",
+        Amount: amount,
+        AmountUSD: amount,
+        depositAddress: address,
+        txHash: tx.hash,
+        explorer: `${process.env.ARBISCANEXPLORE || "https://solscan.io/tx"}/${tx.hash}`,
+        source: "custodial",
+        chain: network,
+      }));
+
+      try {
+        await depositList.insertMany(inserts, { ordered: false });
+      } catch (e) {
+        // duplicate key errors are expected — ignore
+      }
+
+      const totalAmount = newTxs.reduce((s, { amount }) => s + amount, 0);
+      await UserPublicWallet.updateOne(
+        { telegramId: String(telegramId) },
+        { $inc: { balance: totalAmount } }
+      );
+
+      console.log(`[sweep] user ${telegramId} — credited $${totalAmount} from ${newTxs.length} new tx(s) on ${network}`);
+      totalNewDeposits += newTxs.length;
+    }
+
+    return { success: true, newDeposits: totalNewDeposits };
+  } catch (error) {
+    console.error("sweepUserDepositsHandler error:", error);
+    return { success: false, message: error.message };
   }
 }
 
@@ -6311,4 +6681,176 @@ module.exports = {
   disputeMarketHandler,
   getUserMarketsHandler,
   getUserWithdrawList,
+  sweepUserDepositsHandler,
+  addMarketLiquidityHandler,
+  sellPositionHandler,
 };
+
+/**
+ * addMarketLiquidityHandler
+ * External users add USDT liquidity to an active Arken EVM market.
+ * 1. Validates balance
+ * 2. Calls arkenEvm.seedLiquidity with user's custodial ARB key
+ * 3. Deducts internal balance only after chain succeeds
+ */
+async function addMarketLiquidityHandler(data) {
+  try {
+    const { telegramId, marketId, amount } = data;
+    if (!telegramId) return { status: false, message: "telegramId required" };
+    if (!marketId) return { status: false, message: "marketId required" };
+    const amountNum = Number(amount);
+    if (!amountNum || amountNum < 1) return { status: false, message: "Minimum liquidity is $1" };
+
+    const market = await Market.findById(marketId).lean();
+    if (!market) return { status: false, message: "Market not found" };
+    if (market.source !== "arken" || !market.arkenMarketAddress) {
+      return { status: false, message: "Liquidity can only be added to Arken EVM markets" };
+    }
+    if (market.marketStatus !== "active") {
+      return { status: false, message: "Market is not active" };
+    }
+
+    // MongoDB balance gate
+    const { balance: userBalance } = await getBalance(telegramId);
+    if (userBalance < amountNum) {
+      return { status: false, message: `Insufficient balance. You have $${userBalance.toFixed(2)}, need $${amountNum}` };
+    }
+
+    // Derive chain from market (arken = EVM/ARB, solana = SOL)
+    const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+    const chainKey = (market.chain || "EVM").toUpperCase();
+    const custodialWallet = chainKey === "SOL"
+      ? custodialDoc?.wallets?.find(w => (w.network || "").toUpperCase().includes("SOL"))
+      : custodialDoc?.wallets?.find(w => (w.network || "").toUpperCase().includes("ARB"));
+
+    if (!custodialWallet?.privateKey || !custodialWallet?.address) {
+      return { status: false, message: `No ${chainKey} custodial wallet found for this user` };
+    }
+
+    const userPrivateKey = common.decrypt(custodialWallet.privateKey);
+
+    // On-chain balance verification
+    const onChainBalance = await arkenEvm.getUsdtBalance(custodialWallet.address);
+    if (onChainBalance < amountNum) {
+      return {
+        status: false,
+        message: `Insufficient on-chain USDT. Wallet holds $${onChainBalance.toFixed(2)}, need $${amountNum}`,
+      };
+    }
+
+    // Add liquidity on-chain — calls addLiquidity(amount) on ArkenMarket
+    console.log(`[addLiquidity] User ${telegramId} adding $${amountNum} USDT to market ${market.arkenMarketAddress}`);
+    const { txHash } = await arkenEvm.seedLiquidity({
+      adminPrivateKey: userPrivateKey,
+      marketAddress: market.arkenMarketAddress,
+      amountUsdt: amountNum,
+    });
+    console.log(`[addLiquidity] Success — tx: ${txHash}`);
+
+    await UserPublicWallet.updateOne(
+      { telegramId: String(telegramId) },
+      { $inc: { balance: -amountNum } }
+    );
+
+    await Market.updateOne(
+      { _id: market._id },
+      {
+        $inc: { liquidity: amountNum, totalLiquidity: amountNum },
+        $push: { lpProviders: { telegramId: Number(telegramId), amount: amountNum, addedAt: new Date() } },
+      }
+    );
+
+    return { status: true, success: true, txHash, amountAdded: amountNum };
+  } catch (error) {
+    console.error("addMarketLiquidityHandler error:", error.message);
+    return { status: false, message: error.message || "Failed to add liquidity" };
+  }
+}
+
+/**
+ * sellPositionHandler
+ * Allows a user to exit an open Arken EVM bet position before market resolution.
+ * Calls sellOption() on the ArkenMarket contract which:
+ *   1. Reads user's on-chain shares
+ *   2. Calculates proportional current value from the pool
+ *   3. Deducts 3% fee (2% platform + 1% LP)
+ *   4. Returns USDT payout to user's custodial wallet
+ * After chain success, credits MongoDB balance and marks prediction as CLOSED.
+ */
+async function sellPositionHandler(data) {
+  try {
+    const { telegramId, predictionId } = data;
+    if (!telegramId) return { status: false, message: "telegramId required" };
+    if (!predictionId) return { status: false, message: "predictionId required" };
+
+    // 1. Find and validate the prediction
+    const prediction = await Prediction.findById(predictionId).lean();
+    if (!prediction) return { status: false, message: "Prediction not found" };
+    if (Number(prediction.telegramId) !== Number(telegramId)) {
+      return { status: false, message: "Unauthorized: not your prediction" };
+    }
+    if (prediction.source !== "arken") {
+      return { status: false, message: "Sell is only available for Arken EVM positions" };
+    }
+    if (prediction.status !== "OPEN") {
+      return { status: false, message: "Position is not open" };
+    }
+
+    // 2. Find the market to get arkenMarketAddress
+    const market = await Market.findById(prediction.manualId).lean();
+    if (!market) return { status: false, message: "Market not found" };
+    if (!market.arkenMarketAddress) return { status: false, message: "No on-chain market address" };
+    if (market.marketStatus !== "active") {
+      return { status: false, message: "Market is not active — cannot sell" };
+    }
+
+    // 3. Get custodial ARB wallet
+    const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+    const arbWallet = custodialDoc?.wallets?.find(
+      (w) => (w.network || "").toUpperCase().includes("ARB")
+    );
+    if (!arbWallet?.privateKey || !arbWallet?.address) {
+      return { status: false, message: "No ARB custodial wallet found for this user" };
+    }
+
+    const userPrivateKey = common.decrypt(arbWallet.privateKey);
+
+    // 4. Execute sell on-chain — reads shares from contract then calls sellOption()
+    console.log(`[sellPosition] User ${telegramId} selling option ${prediction.outcomeIndex} in market ${market.arkenMarketAddress}`);
+    const { txHash, payout } = await arkenEvm.sellPosition({
+      privateKey: userPrivateKey,
+      marketAddress: market.arkenMarketAddress,
+      optionIndex: Number(prediction.outcomeIndex),
+    });
+    console.log(`[sellPosition] On-chain success. TxHash: ${txHash}, payout: ${payout} USDT`);
+
+    // 5. Chain confirmed — credit MongoDB balance with actual payout
+    await UserPublicWallet.updateOne(
+      { telegramId: String(telegramId) },
+      { $inc: { balance: payout } }
+    );
+
+    // 6. Mark prediction as CLOSED
+    await Prediction.updateOne(
+      { _id: predictionId },
+      {
+        status: "CLOSED",
+        finalPayout: payout,
+        settledAt: new Date(),
+        resolvedOutcome: "Sold",
+        evmTxHash: txHash,
+      }
+    );
+
+    return {
+      status: true,
+      success: true,
+      txHash,
+      payout,
+      message: `Position sold. You received $${payout.toFixed(4)} USDT`,
+    };
+  } catch (error) {
+    console.error("sellPositionHandler error:", error.message);
+    return { status: false, message: error.message || "Failed to sell position" };
+  }
+}

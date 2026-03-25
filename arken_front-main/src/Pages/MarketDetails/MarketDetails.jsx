@@ -96,6 +96,10 @@ const lastUpdateRef = useRef(0);
     seconds: 0
   });
 
+  const [lpAmount, setLpAmount] = useState('');
+  const [lpLoading, setLpLoading] = useState(false);
+  const [showLpForm, setShowLpForm] = useState(false);
+
 //  useEffect(() => {
 //     if (!item) return; 
 
@@ -358,6 +362,7 @@ const lastUpdateRef = useRef(0);
 
 
   const fetchMarketById = async () => {
+  // --- Standard market: fetch from backend ---
   try {
     setLoading(true);
     setLoadingStats(true);
@@ -377,13 +382,21 @@ const lastUpdateRef = useRef(0);
       return;
     }
 
-    const localMarket = resp.data; 
+    const localMarket = resp.data;
 
     setMarket(localMarket);
     setMarkets([localMarket]);
     setStats([localMarket]);
 
-    
+    // Fetch live on-chain prices for Arken EVM markets
+    if (localMarket?.source === "arken" && localMarket?.arkenMarketAddress) {
+      import("../../services/arkenService").then(({ getArkenMarketPrices }) => {
+        getArkenMarketPrices(localMarket.arkenMarketAddress).then(({ yesPrice }) => {
+          setCurrentPrice(`${(yesPrice * 100).toFixed(1)}%`);
+        }).catch(() => {});
+      });
+    }
+
     if (localMarket?.category === "Crypto" && localMarket?.currency) {
       const pair = binanceSymbolMap[localMarket.currency.toUpperCase()];
 
@@ -409,8 +422,8 @@ const lastUpdateRef = useRef(0);
 
         lastUpdateRef.current = now;
 
-        const data = JSON.parse(event.data);
-        const price = Number(data.c);
+        const wsData = JSON.parse(event.data);
+        const price = Number(wsData.c);
         setCurrentPrice(`$${price.toLocaleString()}`);
       };
 
@@ -438,7 +451,29 @@ const lastUpdateRef = useRef(0);
     }
   }, [id]);
 
-const handleOutcomeClick = (outcome, price,index) => {
+const handleAddLiquidity = async () => {
+  if (!telegramId) return toast.error('Open this app from Telegram');
+  if (!lpAmount || Number(lpAmount) < 1) return toast.error('Minimum liquidity is $1');
+  setLpLoading(true);
+  try {
+    const resp = await postMethod({
+      apiUrl: apiService.addMarketLiquidity,
+      payload: { telegramId, marketId: market._id, amount: Number(lpAmount) },
+    });
+    if (resp?.status || resp?.success) {
+      toast.success('Liquidity added! It will appear on-chain shortly.');
+      setLpAmount('');
+    } else {
+      toast.error(resp?.message || 'Failed to add liquidity');
+    }
+  } catch {
+    toast.error('Something went wrong');
+  } finally {
+    setLpLoading(false);
+  }
+};
+
+const handleOutcomeClick = (outcome, price, index) => {
   const tokenId = market.outcomeTokenIds?.[outcome];
   setSelectedOutcome({
     outcome,
@@ -448,7 +483,7 @@ const handleOutcomeClick = (outcome, price,index) => {
     side: "buy",
   });
 
-  handleBotStatusOpen(); 
+  handleBotStatusOpen();
 };
 
 
@@ -536,7 +571,7 @@ const handleOutcomeClick = (outcome, price,index) => {
     </span>
     <span className='crypto_manualinsidesecspan' style={pageStyle.crypto_manualinsidesecspan}>
       <h6 className='crypto_manualinsidesecsix' style={pageStyle.crypto_manualinsidesecsix}>
-        {market?.source === 'poly' ? "POLY" : "Other"}
+        {market?.source === 'poly' ? "POLY" : market?.source === 'arken' ? "ARKEN" : market?.source === 'solana' ? "SOLANA" : "Other"}
       </h6>
     </span>
     <span className='crypto_manualinsidesecspan' style={pageStyle.crypto_manualinsidesecspan}>
@@ -682,6 +717,41 @@ const handleOutcomeClick = (outcome, price,index) => {
               );
             })}
           </div>
+          {market?.source === 'arken' && isActive && (
+            <div
+              style={pageStyle.btn_lp}
+              onClick={() => setShowLpForm(prev => !prev)}
+            >
+              <h5 style={pageStyle.btn_yesandnobtnfive} className='btn_yesandnobtnfive'>
+                {showLpForm ? 'Hide Liquidity Form' : 'Add Liquidity'}
+              </h5>
+            </div>
+          )}
+          {market?.source === 'arken' && isActive && showLpForm && (
+            <div style={{ ...pageStyle.lp_section, marginTop: `${moderateScale(12)}px` }}>
+              <h6 style={pageStyle.lp_title}>Add Liquidity</h6>
+              <p style={pageStyle.lp_desc}>
+                Earn LP fees by adding USDT to this market's pool. Your funds are split equally across all outcomes.
+              </p>
+              <div style={pageStyle.lp_row}>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Amount (USDT)"
+                  value={lpAmount}
+                  onChange={e => setLpAmount(e.target.value)}
+                  style={pageStyle.lp_input}
+                />
+                <button
+                  style={{ ...pageStyle.lp_btn, opacity: lpLoading ? 0.6 : 1 }}
+                  disabled={lpLoading}
+                  onClick={handleAddLiquidity}
+                >
+                  {lpLoading ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            </div>
+          )}
         </>
       );
     })()}
@@ -880,7 +950,61 @@ const pageStyle = {
     } ,
     btc_marketdetailspaara:{
     fontSize:`${moderateScale(14)}px`,
-    }
+    },
+    btn_lp: {
+      marginTop: `${moderateScale(10)}px`,
+      padding: `${moderateScale(10)}px`,
+      borderRadius: `${moderateScale(8)}px`,
+      background: 'rgba(74,222,128,0.1)',
+      border: '1px solid rgba(74,222,128,0.35)',
+      textAlign: 'center',
+      cursor: 'pointer',
+      color: 'rgba(74,222,128,1)',
+    },
+    lp_section: {
+      background: 'rgba(74,222,128,0.06)',
+      border: '1px solid rgba(74,222,128,0.2)',
+      borderRadius: `${moderateScale(10)}px`,
+      padding: `${moderateScale(14)}px`,
+      marginBottom: `${moderateScale(16)}px`,
+    },
+    lp_title: {
+      fontSize: `${moderateScale(13)}px`,
+      color: 'rgba(74,222,128,0.9)',
+      marginBottom: `${moderateScale(6)}px`,
+      fontWeight: 600,
+    },
+    lp_desc: {
+      fontSize: `${moderateScale(11)}px`,
+      color: 'rgba(255,255,255,0.45)',
+      marginBottom: `${moderateScale(10)}px`,
+    },
+    lp_row: {
+      display: 'flex',
+      gap: `${moderateScale(8)}px`,
+      alignItems: 'center',
+    },
+    lp_input: {
+      flex: 1,
+      background: 'rgba(255,255,255,0.07)',
+      border: '1px solid rgba(255,255,255,0.15)',
+      borderRadius: `${moderateScale(8)}px`,
+      padding: `${moderateScale(8)}px ${moderateScale(10)}px`,
+      color: '#fff',
+      fontSize: `${moderateScale(13)}px`,
+      outline: 'none',
+    },
+    lp_btn: {
+      background: 'rgba(74,222,128,0.15)',
+      border: '1px solid rgba(74,222,128,0.4)',
+      borderRadius: `${moderateScale(8)}px`,
+      color: 'rgba(74,222,128,1)',
+      fontSize: `${moderateScale(13)}px`,
+      fontWeight: 600,
+      padding: `${moderateScale(8)}px ${moderateScale(16)}px`,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
+    },
 }
 
 export default MarketDetails

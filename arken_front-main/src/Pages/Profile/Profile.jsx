@@ -26,6 +26,7 @@ const Profile = () => {
   const [loadingBets, setLoadingBets] = useState(false);
   const [loadingCashout, setLoadingCashout] = useState(false);
   const [cashoutLoadingId, setCashoutLoadingId] = useState(null);
+  const [sellLoadingId, setSellLoadingId] = useState(null);
   const [activeBets, setActiveBets] = useState([]);
   console.log(activeBets, "activeBets==");
   const [userProfile, setUserProfile] = useState(null);
@@ -47,7 +48,7 @@ const Profile = () => {
     tabFilter(tabName);
   }, [tabName]);
 
-  useUserSocket(telegramUser.telegramId, (data) => {
+  useUserSocket(telegramUser?.telegramId, (data) => {
     setActiveBets((prev) =>
       prev.map((p) =>
         p._id === data.predictionId
@@ -84,7 +85,7 @@ const Profile = () => {
     try {
       setLoadingBets(true);
 
-      const telegramUserID = telegramUser.telegramId;
+      const telegramUserID = telegramUser?.telegramId;
       // const telegramUserID = Number('1453204703');
       if (!telegramUserID) {
         console.error("Telegram user not found");
@@ -155,7 +156,7 @@ const Profile = () => {
     try {
       setLoadingCompletedBets(true);
 
-      const telegramUserID = telegramUser.telegramId;
+      const telegramUserID = telegramUser?.telegramId;
       // const telegramUserID = Number("1453204703");
       if (!telegramUserID) {
         console.error("Telegram user not found");
@@ -188,7 +189,7 @@ const Profile = () => {
     try {
       setLoadingProfile(true);
 
-      const telegramUserID = telegramUser.telegramId;
+      const telegramUserID = telegramUser?.telegramId;
       // const telegramUserID = Number("1453204703");
 
       if (!telegramUserID) {
@@ -221,7 +222,7 @@ const Profile = () => {
   const getReferralInfo = async () => {
     try {
       setLoadingReferral(true);
-      const telegramUserID = telegramUser.telegramId;
+      const telegramUserID = telegramUser?.telegramId;
       if (!telegramUserID) { setLoadingReferral(false); return; }
       const data = {
         apiUrl: apiService.getReferralInfo,
@@ -238,10 +239,37 @@ const Profile = () => {
     }
   };
 
+  const handleSellPosition = async (predictionId) => {
+    try {
+      setSellLoadingId(predictionId);
+      const telegramUserID = telegramUser?.telegramId;
+      if (!telegramUserID) return;
+
+      const resp = await postMethod({
+        apiUrl: apiService.sellPosition,
+        payload: { telegramId: telegramUserID, predictionId },
+      });
+
+      setSellLoadingId(null);
+      if (resp.status || resp.success) {
+        const payout = resp.payout?.toFixed(4) ?? "0";
+        toast.success(`Sold! You received $${payout} USDT`);
+        getActiveBets();
+        getCompletedBets();
+      } else {
+        toast.error(resp.message || "Failed to sell position");
+      }
+    } catch (error) {
+      setSellLoadingId(null);
+      toast.error("Error selling position");
+      console.error("Sell error:", error);
+    }
+  };
+
   const getMyMarkets = async () => {
     try {
       setLoadingMyMarkets(true);
-      const telegramUserID = telegramUser.telegramId;
+      const telegramUserID = telegramUser?.telegramId;
       if (!telegramUserID) { setLoadingMyMarkets(false); return; }
       const resp = await postMethod({
         apiUrl: apiService.mymarkets,
@@ -527,22 +555,16 @@ const Profile = () => {
                                 >
                                   <div className="prfl_tab_itmexit">
                                     <span
-                                      className={`prfl_tab_itmBdg ${
-                                        item?.status?.toLocaleLowerCase() ===
-                                        "pending"
-                                          ? "pendg_Bdg"
-                                          : "pendg_Bdg"
-                                      }`}
+                                      className="prfl_tab_itmBdg pendg_Bdg"
                                       style={pageStyle.prfl_tab_itmBdg}
                                     >
                                       {item.status}
-                                      {/* {item.unrealizedPnl ?? 'Empty'} */}
-                                      {/* {item.currentPrice ?? 'Empty'} */}
                                     </span>
                                     <span
                                       className={`prfl_tab_itmBdg ${
-                                        item?.bitSide?.toLocaleLowerCase() ===
-                                        "Yes"
+                                        item.type === "lp"
+                                          ? "pendg_Bdg"
+                                          : item?.bitSide?.toLocaleLowerCase() === "yes"
                                           ? "pendg_Yes"
                                           : "pendg_No"
                                       }`}
@@ -552,21 +574,44 @@ const Profile = () => {
                                     </span>
                                   </div>
 
-                                  <div>
-                                    <span
-                                      onClick={() =>
-                                        cashoutLoadingId === item._id
-                                          ? null
-                                          : handleCashout(item._id)
-                                      }
-                                      className={`prfl_tab_itmexit pendg_Bdg`}
-                                      style={pageStyle.prfl_tab_itmBdg}
-                                    >
-                                      {cashoutLoadingId === item._id
-                                        ? "Processing..."
-                                        : "Closebet"}
-                                    </span>
-                                  </div>
+                                  {item.type !== "lp" && (
+                                    <div>
+                                      {item.source === "arken" ? (
+                                        <span
+                                          onClick={() =>
+                                            sellLoadingId === item._id
+                                              ? null
+                                              : handleSellPosition(item._id)
+                                          }
+                                          className="prfl_tab_itmexit pendg_Bdg"
+                                          style={{
+                                            ...pageStyle.prfl_tab_itmBdg,
+                                            backgroundColor: "rgba(255,165,0,0.15)",
+                                            color: "#FFA500",
+                                            cursor: sellLoadingId === item._id ? "not-allowed" : "pointer",
+                                          }}
+                                        >
+                                          {sellLoadingId === item._id
+                                            ? "Selling..."
+                                            : "Sell"}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          onClick={() =>
+                                            cashoutLoadingId === item._id
+                                              ? null
+                                              : handleCashout(item._id)
+                                          }
+                                          className="prfl_tab_itmexit pendg_Bdg"
+                                          style={pageStyle.prfl_tab_itmBdg}
+                                        >
+                                          {cashoutLoadingId === item._id
+                                            ? "Processing..."
+                                            : "Closebet"}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                                 <div
                                   className="prfl_tab_CountWrp"
@@ -585,67 +630,69 @@ const Profile = () => {
                                         imgPic={betAmunt_img}
                                         alt="betAmunt_img"
                                       />
-                                      Bet Amount
+                                      {item.type === "lp" ? "LP Amount" : "Bet Amount"}
                                     </h6>
                                     <p
                                       style={pageStyle.prfl_tab_CountPara}
                                       className="prfl_tab_CountPara"
                                     >
-                                      {item.amount + " " + 'USDC'}
-                                      {/* {item.amount + " " + item.currency} */}
+                                      {item.amount + " USDC"}
                                     </p>
                                   </div>
-                                  <div
-                                    className="prfl_tab_Countitm"
-                                    style={pageStyle.prfl_tab_Countitm}
-                                  >
-                                    <h6
-                                      style={pageStyle.prfl_tab_CountHed}
-                                      className="prfl_tab_CountHed"
-                                    >
-                                      <ImageComponent
-                                        styles={pageStyle.prfl_tab_Countimg}
-                                        imgPic={balnc_mesImg}
-                                        alt="balnc_mesImg"
-                                      />
-                                      PNL
-                                    </h6>
-                                    <p
-                                      style={pageStyle.prfl_tab_CountPara}
-                                      className="prfl_tab_CountPara"
-                                    >
-                                      {Number(item.unrealizedPnl).toFixed(6) ??
-                                        "0.00"}
-                                    </p>
-                                  </div>
-                                  <div
-                                    className="prfl_tab_Countitm"
-                                    style={pageStyle.prfl_tab_Countitm}
-                                  >
-                                    <h6
-                                      style={pageStyle.prfl_tab_CountHed}
-                                      className="prfl_tab_CountHed"
-                                    >
-                                      <ImageComponent
-                                        styles={pageStyle.prfl_tab_Countimg}
-                                        imgPic={cup_img2}
-                                        alt="cup_img2"
-                                      />
-                                      Potential Win
-                                    </h6>
-                                    <p
-                                      style={pageStyle.prfl_tab_CountPara}
-                                      className="prfl_tab_CountPara poten_win"
-                                    >
-                                      {item.potentialPayout.toFixed(6)}
-                                    </p>
-                                  </div>
+                                  {item.type !== "lp" && (
+                                    <>
+                                      <div
+                                        className="prfl_tab_Countitm"
+                                        style={pageStyle.prfl_tab_Countitm}
+                                      >
+                                        <h6
+                                          style={pageStyle.prfl_tab_CountHed}
+                                          className="prfl_tab_CountHed"
+                                        >
+                                          <ImageComponent
+                                            styles={pageStyle.prfl_tab_Countimg}
+                                            imgPic={balnc_mesImg}
+                                            alt="balnc_mesImg"
+                                          />
+                                          PNL
+                                        </h6>
+                                        <p
+                                          style={pageStyle.prfl_tab_CountPara}
+                                          className="prfl_tab_CountPara"
+                                        >
+                                          {Number(item.unrealizedPnl).toFixed(6) ?? "0.00"}
+                                        </p>
+                                      </div>
+                                      <div
+                                        className="prfl_tab_Countitm"
+                                        style={pageStyle.prfl_tab_Countitm}
+                                      >
+                                        <h6
+                                          style={pageStyle.prfl_tab_CountHed}
+                                          className="prfl_tab_CountHed"
+                                        >
+                                          <ImageComponent
+                                            styles={pageStyle.prfl_tab_Countimg}
+                                            imgPic={cup_img2}
+                                            alt="cup_img2"
+                                          />
+                                          Potential Win
+                                        </h6>
+                                        <p
+                                          style={pageStyle.prfl_tab_CountPara}
+                                          className="prfl_tab_CountPara poten_win"
+                                        >
+                                          {item.potentialPayout.toFixed(6)}
+                                        </p>
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                                 <p
                                   style={pageStyle.prfl_tab_plcedOn}
                                   className="prfl_tab_plcedOn"
                                 >
-                                  Placed on{" "}
+                                  {item.type === "lp" ? "Added on" : "Placed on"}{" "}
                                   {new Date(item.createdAt).toLocaleString()}
                                 </p>
                               </div>
@@ -796,7 +843,7 @@ const Profile = () => {
                                   {item.question}
                                 </h6>
                                 <div className="prfl_tab_itmBdgWrp" style={pageStyle.prfl_tab_itmBdgWrp}>
-                                  <span className="prfl_tab_itmBdg pendg_Bdg" style={pageStyle.prfl_tab_itmBdg}>
+                                  <span className={`prfl_tab_itmBdg ${item.marketStatus === 'active' ? 'actv_Bdg' : item.marketStatus === 'resolved' ? 'cmplt_Bdg' : 'pendg_Bdg'}`} style={pageStyle.prfl_tab_itmBdg}>
                                     {item.marketStatus}
                                   </span>
                                   <span className="prfl_tab_itmBdg" style={pageStyle.prfl_tab_itmBdg}>

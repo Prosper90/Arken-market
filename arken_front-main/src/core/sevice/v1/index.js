@@ -40,6 +40,9 @@ confirmJoinPrivateMarket: "user/confirmJoinPrivateMarket",
 disputeMarket: "user/disputeMarket",
 mymarkets: "user/my-markets",
 get_withdraw_list: "user/get_withdraw_list",
+addMarketLiquidity: "user/addMarketLiquidity",
+sweepDeposits: "user/sweepDeposits",
+sellPosition: "user/sellPosition",
 
 };
 

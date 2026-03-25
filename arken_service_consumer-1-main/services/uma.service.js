@@ -8,7 +8,7 @@
  *   4. After liveness expires unchallenged → settleAssertion() finalises the result
  *
  * Required env vars (add to consumer-1 .env):
- *   ARB_RPC_URL          RPC endpoint (Arbitrum One or Arbitrum Sepolia for testnet)
+ *   ARB_RPC              RPC endpoint (Arbitrum One or Arbitrum Sepolia for testnet)
  *   EVM_PRIVATE_KEY      Wallet that signs & pays gas; must hold bond tokens + ETH
  *   UMA_OO_ADDRESS       OptimisticOracleV3 contract address
  *   UMA_BOND_CURRENCY    ERC-20 bond token address (TestnetERC20 on Sepolia, USDC on mainnet)
@@ -42,10 +42,10 @@ const ERC20_ABI = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getSigner() {
-  const rpcUrl = process.env.ARB_RPC_URL;
+  const rpcUrl = process.env.ARB_RPC;
   const privateKey = process.env.EVM_PRIVATE_KEY;
   if (!rpcUrl || !privateKey) {
-    throw new Error("ARB_RPC_URL and EVM_PRIVATE_KEY must be set in .env");
+    throw new Error("ARB_RPC and EVM_PRIVATE_KEY must be set in .env");
   }
   const provider = new ethers.JsonRpcProvider(rpcUrl);
   return new ethers.Wallet(privateKey, provider);
@@ -179,7 +179,7 @@ async function settleUMAAssertion(assertionId) {
  * @returns {{ settled: boolean, disputeTime: number, disputer: string }}
  */
 async function getAssertionStatus(assertionId) {
-  const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL);
+  const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC);
   const oov3 = getOOv3(provider);
 
   const a = await oov3.assertions(assertionId);

@@ -24,6 +24,7 @@ import CreateMarket from './Pages/CreateMarket/CreateMarket'
 import JoinPrivateMarket from './Pages/JoinPrivateMarket/JoinPrivateMarket'
 import {MarketProvider} from './context/MarketContext'
 import {TelegramUserProvider} from './context/TelegramUserContext'
+import {ChainProvider} from './context/ChainContext'
 import { Toaster } from "react-hot-toast";
 import Redirect from './Pages/Onboarding/redirect'
 function App() {
@@ -37,6 +38,7 @@ function RequireAuth({ children }) {
   return (
     <>
      <TelegramUserProvider>
+<ChainProvider>
 <MarketProvider>
  
           <BrowserRouter>
@@ -75,7 +77,7 @@ function RequireAuth({ children }) {
      
       </BrowserRouter>
 </MarketProvider>
-
+</ChainProvider>
      </TelegramUserProvider>
      
     

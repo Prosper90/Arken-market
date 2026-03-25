@@ -63,6 +63,7 @@ if (process.env.USE_SSL === "true") {
 }
 
 initSocket(server);
+require('./redisSubscriber'); // listens for DEPOSIT_CONFIRMED and emits to socket rooms
 
 async function createAdminWalletIfNotExists(adminUserId) {
   let wallet = await AdminWallet.findOne({ userId: adminUserId });

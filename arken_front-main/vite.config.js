@@ -17,6 +17,20 @@ const proxyConfig = {
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    minify: 'esbuild',
+  },
+  resolve: {
+    dedupe: [
+      '@reown/appkit',
+    ],
+  },
+  optimizeDeps: {
+    include: [
+      '@reown/appkit',
+      '@reown/appkit-adapter-wagmi',
+    ],
+  },
   server: {
     port: 3000,
     host: true,

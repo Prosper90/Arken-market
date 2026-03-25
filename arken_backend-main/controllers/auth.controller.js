@@ -398,10 +398,11 @@ exports.verifyWalletAppHandler = async (req, res) => {
   });
 };
 exports.userbetplaceHandler = async (req, res) => {
+  // 90-second timeout — Arken EVM bets do one on-chain tx.wait(1)
   const result = await publishAndWait("bet_queue", {
     ...req.body,
     action: queuename.userbetplace,
-  });
+  }, 90000);
   res.json({
     action: queuename.userbetplace,
     ...result,
@@ -820,6 +821,17 @@ exports.getUserByTelegramIdHandler = async (req, res) => {
   });
 };
 
+exports.sweepUserDepositsHandler = async (req, res) => {
+  const result = await publishAndWait("unique_id_queue", {
+    ...req.body,
+    action: queuename.sweepUserDeposits,
+  });
+  res.json({
+    action: queuename.sweepUserDeposits,
+    ...result,
+  });
+};
+
 exports.getReferralInfoHandler = async (req, res) => {
   const result = await publishAndWait("commision_queue", {
     ...req.body,
@@ -832,10 +844,12 @@ exports.getReferralInfoHandler = async (req, res) => {
 };
 
 exports.createUserMarketHandler = async (req, res) => {
+  // 120-second timeout — market creation does 2 on-chain tx.wait(1) calls
+  // (factory deploy + liquidity seed) which can take 30–90s under load.
   const result = await publishAndWait("markets_queue", {
     ...req.body,
     action: queuename.createUserMarket,
-  });
+  }, 120000);
   res.json({
     action: queuename.createUserMarket,
     ...result,
@@ -904,6 +918,30 @@ exports.getUserWithdrawListHandler = async (req, res) => {
   });
   res.json({
     action: queuename.getUserWithdrawList,
+    ...result,
+  });
+};
+
+exports.addMarketLiquidityHandler = async (req, res) => {
+  // 90-second timeout — one on-chain tx.wait(1)
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.addMarketLiquidity,
+  }, 90000);
+  res.json({
+    action: queuename.addMarketLiquidity,
+    ...result,
+  });
+};
+
+exports.sellPositionHandler = async (req, res) => {
+  // 90-second timeout — one on-chain tx.wait(1)
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.sellPosition,
+  }, 90000);
+  res.json({
+    action: queuename.sellPosition,
     ...result,
   });
 };

@@ -52,8 +52,9 @@ const depositListSchema = new mongoose.Schema(
     AmountUSD:      { type: Number },
     chain:          { type: String },
     explorer:       { type: String },
-    txHash:  { type: String, index: true, sparse: true, unique: true },
-    source:  { type: String, default: "phantom" },
+    txHash:      { type: String, index: true, sparse: true, unique: true },
+    blockNumber: { type: Number, index: true },
+    source:      { type: String, default: "phantom" },
   },
   { timestamps: true }
 );

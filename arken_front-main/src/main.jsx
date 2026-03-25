@@ -169,8 +169,20 @@ import { Buffer } from "buffer";
 //   usePhantom,
 // } from "@phantom/react-sdk";
 // import { AddressType } from "@phantom/browser-sdk";
+// Sanitize stale WalletConnect localStorage entries that contain non-JSON values
+// (e.g. the string "phantom") — these cause AppKit to crash on init with JSON.parse errors
+try {
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key.startsWith('wc@') || key.startsWith('W3M') || key.startsWith('wagmi'))) {
+      try { JSON.parse(localStorage.getItem(key)); }
+      catch { localStorage.removeItem(key); }
+    }
+  }
+} catch { /* ignore — localStorage may be unavailable */ }
+
 const queryClient = new QueryClient()
-const projectId = '287d42b489fce2f51cd3f5a9cfb6b549' 
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '287d42b489fce2f51cd3f5a9cfb6b549'
 
 const config = createConfig({
   chains: [mainnet,arbitrum],
@@ -204,7 +216,7 @@ const SolanaRoot = () => {
         <QueryClientProvider client={queryClient}>
           {/* ADDED SOLANA PROVIDERS HERE */}
           <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets} autoConnect>
+            <WalletProvider wallets={wallets} autoConnect localStorageKey="solanaWalletName">
               <WalletModalProvider>
                     <App />
               </WalletModalProvider>

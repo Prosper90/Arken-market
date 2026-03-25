@@ -55,9 +55,21 @@ const predictionSchema = new mongoose.Schema(
 
     source: {
   type: String,
-  enum: ["manual", "poly"],
+  enum: ["manual", "poly", "rain", "arken", "solana"],
   required: true,
   index: true,
+},
+    rainTxHash: {
+  type: String,
+  default: null,
+},
+evmTxHash: {
+  type: String,
+  default: null,
+},
+solanaTxHash: {
+  type: String,
+  default: null,
 },
 
 groupId: {

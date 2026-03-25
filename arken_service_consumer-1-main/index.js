@@ -951,6 +951,23 @@ What would you like to do?`,
       );
     });
 
+    // ── /clear_cache command ───────────────────────────────────────────────
+    bot.onText(/\/clear_cache/, async (msg) => {
+      const chatId = msg.chat.id;
+      const telegramId = msg.from.id;
+      const ts = Date.now();
+      const webAppUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/?clear=1&t=${ts}&telegramId=${telegramId}`;
+      bot.sendMessage(chatId,
+        "🧹 *Clear App Cache*\n\nThis will reset your local session (wallet selection, chain preference, etc.).\n\nTap the button below to reopen with a clean slate.",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[{ text: "🧹 Reopen Fresh", web_app: { url: webAppUrl } }]],
+          },
+        }
+      );
+    });
+
     // ── /referral command ──────────────────────────────────────────────────
     bot.onText(/\/referral/, async (msg) => {
       const chatId = msg.chat.id;
@@ -1131,7 +1148,7 @@ bot.on("callback_query", async (query) => {
       if (data === "bets_others") filter.category = { $nin: ["Crypto"] };
 
       const markets = await Market.find({
-        active: true,
+        status: { $in: ["active", "pending"] },
         endDate: { $gte: new Date() },
         ...(data !== "bets_all" ? filter : {}),
       }).limit(10).lean();
@@ -1199,14 +1216,8 @@ bot.on("callback_query", async (query) => {
         for (let j = i; j < i + 2 && j < trendingMarkets.length; j++) {
 
           const bet = trendingMarkets[j];
-          const token = generateJwt(telegramId, groupId, bet._id);
-
-          const payload = Buffer.from(
-            JSON.stringify({ marketId: bet._id, token })
-          ).toString("base64");
-
-          const url = `https://t.me/${BOT_USERNAME}?startapp=${payload}`;
           const icon = getCategoryIcon(bet.category);
+          const marketUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/market-details/${bet._id}?v=3&telegramId=${telegramId}`;
 
           row.push({
             text: `${icon} ${
@@ -1214,7 +1225,7 @@ bot.on("callback_query", async (query) => {
                 ? bet.question.slice(0, 24) + "…"
                 : bet.question
             }`,
-            url,
+            web_app: { url: marketUrl },
           });
 
         }
@@ -2096,14 +2107,8 @@ if (data.startsWith("search_page_")) {
 
       for (let j = i; j < i + 2 && j < trendingMarkets.length; j++) {
         const bet = trendingMarkets[j];
-        const token = generateJwt(telegramId, chatId, bet._id);
-
-        const payload = Buffer.from(
-          JSON.stringify({ marketId: bet._id, token })
-        ).toString("base64");
-
-        const url = `https://t.me/${BOT_USERNAME}?startapp=${payload}`;
         const icon = getCategoryIcon(bet.category);
+        const marketUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/market-details/${bet._id}?v=3&telegramId=${telegramId}`;
 
         row.push({
           text: `${icon} ${
@@ -2111,7 +2116,7 @@ if (data.startsWith("search_page_")) {
               ? bet.question.slice(0, 24) + "…"
               : bet.question
           }`,
-          url,
+          web_app: { url: marketUrl },
         });
       }
 
@@ -2524,16 +2529,8 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
       for (let j = i; j < i + 2 && j < results.length; j++) {
 
         const bet = results[j];
-
-        const token = generateJwt(telegramId, chatId, bet._id);
-
-        const payload = Buffer.from(
-          JSON.stringify({ marketId: bet._id, token })
-        ).toString("base64");
-
-        const url = `https://t.me/${BOT_USERNAME}?startapp=${payload}`;
-
         const icon = getCategoryIcon(bet.category);
+        const marketUrl = `${process.env.MINI_APP_URL || "https://arken.blfdemo.online"}/market-details/${bet._id}?v=3&telegramId=${telegramId}`;
 
         row.push({
           text: `${icon} ${
@@ -2541,7 +2538,7 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
               ? bet.question.slice(0, 24) + "…"
               : bet.question
           }`,
-          url,
+          web_app: { url: marketUrl },
         });
 
       }
@@ -2803,11 +2800,25 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
       }
     });
 
-    // --- /wallet command (requires connected wallet) ---
+    // --- /wallet command (requires connected wallet, private chat only) ---
     bot.onText(/\/wallet/, async (msg) => {
       const chatId = msg.chat.id;
       const telegramId = msg.from.id;
       try {
+        // /wallet only works in private chat — groups expose balances publicly
+        if (msg.chat.type !== "private") {
+          return bot.sendMessage(chatId,
+            "💰 *Wallet* is a private command — tap below to open it in DM.",
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [[
+                  { text: "💰 Open My Wallet", url: `https://t.me/${(await bot.getMe()).username}?start=wallet` },
+                ]],
+              },
+            }
+          );
+        }
         if (!await requireWallet(telegramId, chatId)) return;
         const userWalletDoc = await userPublicWalletModel.findOne({ telegramId });
         const user = await User.findOne({ telegramId });

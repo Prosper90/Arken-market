@@ -69,18 +69,20 @@ seconddashboard.jpg
 trustwallet.jpg
 twobots.jpg
 
-# ── Local-only docs (working notes, not needed in repo) ───────────────────────
-DEPLOYMENT.md
-LOCAL_TEST_STEPS.md
-LOCAL_TESTING.md
-MASTER_PLAN.md
-NGROK_STEPS.md
-ORACLES_GUIDE.md
-PROGRESS.md
-STARTUP_GUIDE.md
-TESTING_GUIDE.md
-UMA_GUIDE.md
-ADMIN_BUILD_GUIDE.md
+# ── Local-only docs (working notes, guides, handoffs — not needed in repo) ─────
+*.md
+!README.md
+
+# -- The smart contracts -- #
+/arken_evm
+/arken_solana
+
+
+# ── Custom Folders ────────────
+/rain
+
+# ── Production reference snapshots (local only) ────────────────────────────
+**/onboarding_production.jsx
 
 # ── Env files without leading dot ─────────────────────────────────────────────
 env.production

@@ -39,7 +39,7 @@ export const defaultHomeTabContent = [
     },
     {
         id: 3,
-        tabTitle: 'Manual',
+        tabTitle: 'Arken',
     },
    
 ]

@@ -78,6 +78,9 @@ userBalance:"userBalance",
   disputeMarket: "disputeMarket",
   getUserMarkets: "getUserMarkets",
   getUserWithdrawList: "getUserWithdrawList",
+  addMarketLiquidity: "addMarketLiquidity",
+  sweepUserDeposits: "sweepUserDeposits",
+  sellPosition: "sellPosition",
 };
 
 module.exports = queueNamelist;
