@@ -1954,24 +1954,23 @@ async function verifyTelegramWebAppHandler(data) {
 
     const user = JSON.parse(params.get("user"));
 
-    const dbUser = await usersDB.findOne({
-      telegramId: user.id,
-    });
+    const firstName = user.first_name || "";
+    const username = user.username || firstName;
+    const referralCode = `REF${user.id}`;
 
-    const dbInitUser = await usersDB.updateOne(
+    const dbUser = await usersDB.findOneAndUpdate(
+      { telegramId: user.id },
       {
-        telegramId: user.id,
+        $setOnInsert: {
+          telegramId: user.id,
+          username,
+          firstName,
+          referralCode,
+        },
+        $set: { initData },
       },
-      { $set: { initData: initData } },
+      { upsert: true, new: true },
     );
-
-    if (!dbUser) {
-      return {
-        success: false,
-        code: 404,
-        message: "User not found",
-      };
-    }
 
     return {
       success: true,
