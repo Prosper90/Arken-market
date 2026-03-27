@@ -88,6 +88,9 @@ services:
     environment:
       API_PROXY_TARGET: http://auth-service:4000
       SOCKET_PROXY_TARGET: http://market-service:3003
+    depends_on:
+      - auth-service
+      - market-service
     networks:
       - appnet
 
