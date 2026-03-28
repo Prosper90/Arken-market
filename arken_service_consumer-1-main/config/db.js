@@ -24,11 +24,18 @@ const connectDB = async () => {
       console.log("🧹 Removed old referralCode_1 index");
     }
 
-    // Drop uniqueId_1 if it exists as non-sparse so Mongoose recreates it correctly
+    // Ensure uniqueId_1 is always sparse — drop and recreate if it isn't
     const uniqueIdIndex = indexes.find(i => i.name === "uniqueId_1");
     if (uniqueIdIndex && !uniqueIdIndex.sparse) {
       await collection.dropIndex("uniqueId_1");
-      console.log("🧹 Removed non-sparse uniqueId_1 index (will be recreated as sparse)");
+      console.log("🧹 Dropped non-sparse uniqueId_1 index");
+    }
+    if (!uniqueIdIndex || !uniqueIdIndex.sparse) {
+      await collection.createIndex(
+        { uniqueId: 1 },
+        { unique: true, sparse: true, name: "uniqueId_1" }
+      );
+      console.log("✅ Created sparse uniqueId_1 index");
     }
 
   } catch (err) {
