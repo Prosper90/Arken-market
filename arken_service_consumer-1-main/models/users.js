@@ -62,7 +62,6 @@ const userSchema = new mongoose.Schema(
   },
     uniqueId:{
       type: String,
-      default: null,
     },
     connectedwalletName:{
       type:String,
