@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const userPublicWallet = mongoose.Schema(
   {
-    telegramId: { type: String },
+    telegramId: { type: String, unique: true, index: true },
     balance:     { type: Number, default: 0 },
     holdBalance: { type: Number, default: 0 },
     wallets: [

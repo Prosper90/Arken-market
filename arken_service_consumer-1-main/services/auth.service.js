@@ -4577,17 +4577,17 @@ async function creat_new_wallet(data) {
         message: "telegramId and network are required",
       };
     }
-    let userWallet = await userPublicWallet.findOne({ telegramId });
-    if (userWallet) {
-      const existingWallet = userWallet.wallets.find(
-        (w) => w.network === network
-      );
+    const tid = String(telegramId);
 
+    // Check if wallet for this network already exists (atomic-safe read)
+    const existingDoc = await userPublicWallet.findOne({ telegramId: tid });
+    if (existingDoc) {
+      const existingWallet = existingDoc.wallets.find((w) => w.network === network);
       if (existingWallet) {
         // Private key is managed server-side only (custodial model) — never sent to frontend
         return {
           status: true,
-          message: "Wallet already exists ,and continue to app" ,
+          message: "Wallet already exists ,and continue to app",
           data: {
             address: existingWallet.address,
             network: existingWallet.network,
@@ -4598,7 +4598,7 @@ async function creat_new_wallet(data) {
 
     // Create new wallet based on network type
     let newWallet;
-    
+
     if (network === "ARB" || network === "EVM") {
       const wallet = Wallet.createRandom();
       newWallet = {
@@ -4620,19 +4620,16 @@ async function creat_new_wallet(data) {
       };
     }
 
-    // If user doesn't exist, create new user document
-    if (!userWallet) {
-      userWallet = new userPublicWallet({
-        telegramId,
-        wallets: [newWallet],
-      });
-    } else {
-      // User exists but doesn't have wallet for this network
-      userWallet.wallets.push(newWallet);
-    }
-
-    // Save to database
-    await userWallet.save();
+    // Atomic upsert: creates the document if it doesn't exist, otherwise pushes the new wallet.
+    // Prevents duplicate top-level documents even under concurrent requests.
+    await userPublicWallet.findOneAndUpdate(
+      { telegramId: tid },
+      {
+        $setOnInsert: { telegramId: tid },
+        $push: { wallets: newWallet },
+      },
+      { upsert: true, new: true }
+    );
 
     // Private key is managed server-side only (custodial model) — never sent to frontend
     return {
