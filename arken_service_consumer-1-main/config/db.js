@@ -18,13 +18,17 @@ const connectDB = async () => {
     const collection = mongoose.connection.db.collection("users");
     const indexes = await collection.indexes();
 
-    const oldIndex = indexes.find(i => i.name === "referralCode_1");
-
-    if (oldIndex) {
+    const oldReferralIndex = indexes.find(i => i.name === "referralCode_1");
+    if (oldReferralIndex) {
       await collection.dropIndex("referralCode_1");
       console.log("🧹 Removed old referralCode_1 index");
-    } else {
-      console.log("ℹ referralCode_1 index not found (OK)");
+    }
+
+    // Drop uniqueId_1 if it exists as non-sparse so Mongoose recreates it correctly
+    const uniqueIdIndex = indexes.find(i => i.name === "uniqueId_1");
+    if (uniqueIdIndex && !uniqueIdIndex.sparse) {
+      await collection.dropIndex("uniqueId_1");
+      console.log("🧹 Removed non-sparse uniqueId_1 index (will be recreated as sparse)");
     }
 
   } catch (err) {
