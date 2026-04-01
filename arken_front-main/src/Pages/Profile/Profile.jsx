@@ -43,6 +43,7 @@ const Profile = () => {
 
   const [myMarkets, setMyMarkets] = useState([]);
   const [loadingMyMarkets, setLoadingMyMarkets] = useState(false);
+  const [closingMarketId, setClosingMarketId] = useState(null);
 
   useEffect(() => {
     tabFilter(tabName);
@@ -282,6 +283,29 @@ const Profile = () => {
     } catch (error) {
       setLoadingMyMarkets(false);
       console.error("Error fetching my markets:", error);
+    }
+  };
+
+  const handleCloseMarket = async (marketId) => {
+    try {
+      const telegramUserID = telegramUser?.telegramId;
+      if (!telegramUserID) return;
+      setClosingMarketId(marketId);
+      const resp = await postMethod({
+        apiUrl: apiService.closeMarket,
+        payload: { telegramId: telegramUserID, marketId },
+      });
+      setClosingMarketId(null);
+      if (resp.success) {
+        setMyMarkets((prev) =>
+          prev.map((m) =>
+            m._id === marketId ? { ...m, marketStatus: "closed" } : m
+          )
+        );
+      }
+    } catch (error) {
+      setClosingMarketId(null);
+      console.error("Error closing market:", error);
     }
   };
 
@@ -853,6 +877,15 @@ const Profile = () => {
                                 <p className="prfl_tab_plcedOn" style={pageStyle.prfl_tab_plcedOn}>
                                   Ends: {item.endDate ? new Date(item.endDate).toLocaleDateString() : "—"}
                                 </p>
+                                {item.marketStatus === "active" && (
+                                  <button
+                                    style={pageStyle.closeMarketBtn}
+                                    disabled={closingMarketId === item._id}
+                                    onClick={() => handleCloseMarket(item._id)}
+                                  >
+                                    {closingMarketId === item._id ? "Closing..." : "Close Market"}
+                                  </button>
+                                )}
                               </div>
                             ))
                           ) : (
@@ -992,6 +1025,17 @@ const pageStyle = {
   prfl_tab_itmBdg: {
     padding: `${moderateScale(5)}px ${moderateScale(10)}px`,
     fontSize: `${moderateScale(11)}px`,
+  },
+  closeMarketBtn: {
+    marginTop: `${moderateScale(10)}px`,
+    padding: `${moderateScale(6)}px ${moderateScale(14)}px`,
+    fontSize: `${moderateScale(11)}px`,
+    background: "#FF383C",
+    color: "#fff",
+    border: "none",
+    borderRadius: `${moderateScale(6)}px`,
+    cursor: "pointer",
+    opacity: 1,
   },
   prfl_tab_CountWrp: {
     gap: `${moderateScale(10)}px`,

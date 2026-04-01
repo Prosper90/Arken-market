@@ -307,20 +307,24 @@ cron.schedule("0 0 * * *", async () => {
             if (arkenMarket?.arkenMarketAddress) {
               const arbWallet = walletDoc?.wallets?.find(w => w.network === 'ARB' || w.network === 'EVM');
               if (arbWallet?.privateKey) {
-                arkenEvm.claimWinnings({
-                  privateKey: common.decrypt(arbWallet.privateKey),
-                  marketAddress: arkenMarket.arkenMarketAddress,
-                }).catch(err => console.error(`[ArkenEVM] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
+                common.decrypt(arbWallet.privateKey).then(arbPk =>
+                  arkenEvm.claimWinnings({
+                    privateKey: arbPk,
+                    marketAddress: arkenMarket.arkenMarketAddress,
+                  })
+                ).catch(err => console.error(`[ArkenEVM] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
               }
             }
 
             if (arkenMarket?.solanaMarketId && arkenSolana.isDeployed()) {
               const solWallet = walletDoc?.wallets?.find(w => w.network === 'SOL');
               if (solWallet?.privateKey) {
-                arkenSolana.claimWinnings({
-                  privateKey: common.decrypt(solWallet.privateKey),
-                  mongodbId: arkenMarket.solanaMarketId,
-                }).catch(err => console.error(`[ArkenSolana] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
+                common.decrypt(solWallet.privateKey).then(solPk =>
+                  arkenSolana.claimWinnings({
+                    privateKey: solPk,
+                    mongodbId: arkenMarket.solanaMarketId,
+                  })
+                ).catch(err => console.error(`[ArkenSolana] claimWinnings failed for ${prediction.telegramId}:`, err?.message));
               }
             }
           }

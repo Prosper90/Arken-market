@@ -43,6 +43,7 @@ get_withdraw_list: "user/get_withdraw_list",
 addMarketLiquidity: "user/addMarketLiquidity",
 sweepDeposits: "user/sweepDeposits",
 sellPosition: "user/sellPosition",
+closeMarket: "user/closeMarket",
 
 };
 

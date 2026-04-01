@@ -398,7 +398,7 @@ async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeC
   const txHash = await program.methods
     .createMarket({
       marketId: marketIdArray,
-      endTime: new BN(endTimestamp),
+      endTime: new BN(endTimestamp.toString()),
       outcomeCount: safeOutcomeCount,
     })
     .accounts({
@@ -410,6 +410,7 @@ async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeC
       systemProgram: SystemProgram.programId,
       rent: SYSVAR_RENT_PUBKEY,
     })
+    .signers([keypair])
     .rpc();
 
   console.log("[ArkenSolana] Market created. PDA:", marketPda.toBase58(), "TxHash:", txHash);
@@ -490,6 +491,42 @@ async function claimWinnings({ privateKey, mongodbId }) {
   return { txHash, walletAddress: keypair.publicKey.toBase58() };
 }
 
+// ─── Admin: Close Market Early ────────────────────────────────────────────────
+
+/**
+ * Early-close a Solana market before its endTime.
+ * Only the market authority (admin keypair) can call this.
+ *
+ * @param {object} params
+ * @param {string} params.adminPrivateKey  - Admin Solana keypair
+ * @param {string} params.mongodbId        - Market's MongoDB _id
+ * @returns {Promise<{ txHash: string } | null>}
+ */
+async function closeMarket({ adminPrivateKey, mongodbId }) {
+  if (!isDeployed()) {
+    console.warn("[ArkenSolana] Program not deployed — skipping closeMarket");
+    return null;
+  }
+
+  const keypair = loadKeypair(adminPrivateKey);
+  const program = getProgram(keypair);
+
+  const marketIdArray = mongoIdToBytes32(mongodbId);
+  const [marketPda] = deriveMarketPDA(marketIdArray);
+
+  const txHash = await program.methods
+    .closeMarket()
+    .accounts({
+      authority: keypair.publicKey,
+      market: marketPda,
+    })
+    .signers([keypair])
+    .rpc();
+
+  console.log("[ArkenSolana] Market closed early. TxHash:", txHash);
+  return { txHash };
+}
+
 // ─── Read: Market State ───────────────────────────────────────────────────────
 
 async function getMarketState(mongodbId) {
@@ -567,6 +604,7 @@ module.exports = {
   placeBet,
   claimWinnings,
   createMarket,
+  closeMarket,
   resolveMarket,
   getMarketState,
   mongoIdToBytes32,

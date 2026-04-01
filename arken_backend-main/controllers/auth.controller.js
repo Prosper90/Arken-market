@@ -856,6 +856,18 @@ exports.createUserMarketHandler = async (req, res) => {
   });
 };
 
+exports.closeMarketHandler = async (req, res) => {
+  // 60-second timeout — one on-chain tx
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.closeMarket,
+  }, 60000);
+  res.json({
+    action: queuename.closeMarket,
+    ...result,
+  });
+};
+
 exports.submitUMAAssertionHandler = async (req, res) => {
   const result = await publishAndWait("markets_queue", {
     ...req.body,

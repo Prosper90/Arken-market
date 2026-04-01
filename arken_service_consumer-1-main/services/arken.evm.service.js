@@ -324,6 +324,26 @@ async function sellPosition({ privateKey, marketAddress, optionIndex }) {
   return { txHash: receipt.hash, walletAddress: signer.address, payout };
 }
 
+// ─── Admin: Close Market Early ───────────────────────────────────────────────
+
+/**
+ * Early-close an EVM market before its endTime.
+ * Only the market authority can call this.
+ *
+ * @param {object} params
+ * @param {string} params.adminPrivateKey  - Admin wallet private key
+ * @param {string} params.marketAddress    - ArkenMarket contract address
+ * @returns {Promise<{ txHash: string }>}
+ */
+async function closeMarket({ adminPrivateKey, marketAddress }) {
+  const signer = getSignerFromPrivateKey(adminPrivateKey);
+  const market = getMarketContract(marketAddress, signer);
+  const tx = await market.closeMarket();
+  const receipt = await tx.wait(1);
+  console.log("[ArkenEVM] Market closed early. TxHash:", receipt.hash);
+  return { txHash: receipt.hash };
+}
+
 // ─── Read: Market Prices ──────────────────────────────────────────────────────
 
 /**
@@ -349,6 +369,7 @@ module.exports = {
   sellPosition,
   claimWinnings,
   createMarket,
+  closeMarket,
   seedLiquidity,
   resolveMarket,
   fundGas,

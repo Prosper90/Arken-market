@@ -21,6 +21,7 @@
     "cors": "^2.8.5",
     "cron": "^4.4.0",
     "crypto": "^1.0.1",
+    "@aws-sdk/client-kms": "^3.0.0",
     "crypto-js": "^4.2.0",
     "dotenv": "^17.2.3",
     "ethers": "^6.16.0",

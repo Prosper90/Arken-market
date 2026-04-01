@@ -2519,7 +2519,7 @@ async function userbetplaceHandler(data) {
         return { success: false, message: "No ARB custodial wallet found for this user" };
       }
 
-      const userPrivateKey = common.decrypt(arbWallet.privateKey);
+      const userPrivateKey = await common.decrypt(arbWallet.privateKey);
 
       // 3. On-chain balance verification (security check)
       const onChainBalance = await arkenEvm.getUsdtBalance(arbWallet.address);
@@ -3923,10 +3923,8 @@ const sig = await sendAndConfirmTransaction(
      else {
       try {
         const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL);
-        const wallet = new ethers.Wallet(
-          common.decrypt(selectedWallet.privateKey),
-          provider,
-        );
+        const _decryptedPk = await common.decrypt(selectedWallet.privateKey);
+        const wallet = new ethers.Wallet(_decryptedPk, provider);
         // const usdc = new ethers.Contract(
         //   selectedWallet.address,
         //   ERC20_ABI,
@@ -3981,10 +3979,8 @@ const sig = await sendAndConfirmTransaction(
         throw new Error(`Admin wallet does not have ${config.nativeCurrency}`);
       }
       console.log(adminCurrency.privateKey,"adminCurrency.privatekey")
-        const ADMIN_WALLET = new ethers.Wallet(
-  common.decrypt(adminCurrency.privateKey),
-  provider
-);
+        const _adminDecryptedPk = await common.decrypt(adminCurrency.privateKey);
+        const ADMIN_WALLET = new ethers.Wallet(_adminDecryptedPk, provider);
     console.log(ADMIN_WALLET,"ADMIN_WALLET")
     const usdc = new ethers.Contract(
       USDC_ADDRESS,
@@ -4601,17 +4597,19 @@ async function creat_new_wallet(data) {
 
     if (network === "ARB" || network === "EVM") {
       const wallet = Wallet.createRandom();
+      const encryptedEvmPk = await common.encrypt(wallet.privateKey);
       newWallet = {
         network: network,
         address: wallet.address,
-        privateKey: common.encrypt(wallet.privateKey),
+        privateKey: encryptedEvmPk,
       };
     } else if (network === "SOL") {
       const keypair = Keypair.generate();
+      const encryptedSolPk = await common.encrypt(bs58.encode(keypair.secretKey));
       newWallet = {
         network: "SOL",
         address: keypair.publicKey.toBase58(),
-        privateKey: common.encrypt(bs58.encode(keypair.secretKey)),
+        privateKey: encryptedSolPk,
       };
     } else {
       return {
@@ -5213,7 +5211,7 @@ async function createConnection() {
     const solWallet = publicWallet.wallets.find(w => w.network === "SOL");
     const userCurrency = userWallet.wallets.find(w => w.currencySymbol === "SOL");
 
-    const userKeypair = parseKeypair(common.decrypt(solWallet.privateKey));
+    const userKeypair = parseKeypair(await common.decrypt(solWallet.privateKey));
     const userPubkey = userKeypair.publicKey;
 
     const usdcMint = new PublicKey(process.env.SOLANA_USDC_MINT);
@@ -5226,7 +5224,7 @@ async function createConnection() {
     const adminSOL = adminWallet.wallets.find(w => w.currencySymbol === "SOL");
 
     const adminKeypair = parseKeypair(
-      common.decrypt(adminSOL.privateKey)
+      await common.decrypt(adminSOL.privateKey)
     );
 
     /* =======================================================
@@ -5721,7 +5719,8 @@ async function transferUSDC_EVM(telegramId, network, amount) {
     const config = NETWORK_CONFIG[network];
     const provider = new ethers.JsonRpcProvider(config.rpcUrl);
     const usdcAddress = cleanAddress(USDC_ADDRESS);
-    const userWalletInstance = new ethers.Wallet(common.decrypt(networkWallet.privateKey), provider);
+    const _networkDecryptedPk = await common.decrypt(networkWallet.privateKey);
+    const userWalletInstance = new ethers.Wallet(_networkDecryptedPk, provider);
     const usdcContract = new ethers.Contract(usdcAddress, ERC20_ABI, userWalletInstance);
     const rawBalance = await usdcContract.balanceOf(networkWallet.address);
     
@@ -5778,7 +5777,7 @@ const adminUSDCBalanceFormatted = parseFloat(ethers.formatUnits(adminUSDCBalance
 console.log(`Admin USDC Balance (raw): ${adminUSDCBalance.toString()}`);
 console.log(`Admin USDC Balance (formatted): ${adminUSDCBalanceFormatted} USDC`);
 
-      const adminPrivateKey =common.decrypt(adminCurrency.privateKey);
+      const adminPrivateKey = await common.decrypt(adminCurrency.privateKey);
       console.log(adminPrivateKey,"adminPrivateKey")
       if (!adminPrivateKey) {
         throw new Error(`Admin private key not found for ${network}`);
@@ -6135,7 +6134,7 @@ async function createUserMarketHandler(data) {
       }
 
       try {
-        const userPrivateKey = common.decrypt(arbWallet.privateKey);
+        const userPrivateKey = await common.decrypt(arbWallet.privateKey);
         const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
 
         // Step 1: User's key calls the factory — they are the on-chain creator
@@ -6561,6 +6560,81 @@ async function getUserMarketsHandler(data) {
   }
 }
 
+/**
+ * closeMarketHandler
+ * Early-closes an active market on-chain (EVM or SOL) before endDate.
+ * Only the market creator (creatorTelegramId) can close their own market.
+ */
+async function closeMarketHandler(data) {
+  try {
+    const { telegramId, marketId } = data;
+    if (!telegramId || !marketId) {
+      return { success: false, message: "telegramId and marketId are required" };
+    }
+
+    const market = await Market.findById(marketId);
+    if (!market) return { success: false, message: "Market not found" };
+
+    if (String(market.creatorTelegramId) !== String(telegramId)) {
+      return { success: false, message: "Only the market creator can close this market" };
+    }
+
+    if (market.marketStatus !== "active") {
+      return { success: false, message: "Market is not active" };
+    }
+
+    // ── EVM close ────────────────────────────────────────────────────────────
+    if (market.chain === "EVM") {
+      const adminPrivateKey = process.env.EVM_PRIVATE_KEY;
+      if (!adminPrivateKey) {
+        return { success: false, message: "EVM_PRIVATE_KEY not configured" };
+      }
+      if (!market.arkenMarketAddress) {
+        return { success: false, message: "No on-chain EVM market address" };
+      }
+      const result = await arkenEvm.closeMarket({
+        adminPrivateKey,
+        marketAddress: market.arkenMarketAddress,
+      });
+      await Market.updateOne(
+        { _id: market._id },
+        { $set: { marketStatus: "closed", closed: true, active: false } }
+      );
+      return { success: true, txHash: result?.txHash, message: "Market closed early" };
+    }
+
+    // ── SOL close ────────────────────────────────────────────────────────────
+    if (market.chain === "SOL") {
+      const adminPrivateKey = process.env.SOLFLARE_PRIVATE_KEY;
+      if (!adminPrivateKey) {
+        return { success: false, message: "SOLFLARE_PRIVATE_KEY not configured" };
+      }
+      if (!arkenSolana.isDeployed()) {
+        // Just close in DB if program not deployed
+        await Market.updateOne(
+          { _id: market._id },
+          { $set: { marketStatus: "closed", closed: true, active: false } }
+        );
+        return { success: true, message: "Market closed (off-chain only)" };
+      }
+      const result = await arkenSolana.closeMarket({
+        adminPrivateKey,
+        mongodbId: market._id.toString(),
+      });
+      await Market.updateOne(
+        { _id: market._id },
+        { $set: { marketStatus: "closed", closed: true, active: false } }
+      );
+      return { success: true, txHash: result?.txHash, message: "Market closed early" };
+    }
+
+    return { success: false, message: "Unknown market chain" };
+  } catch (error) {
+    console.error("closeMarketHandler error:", error);
+    return { success: false, message: error.message || "Something went wrong" };
+  }
+}
+
 async function sweepUserDepositsHandler(data) {
   const { telegramId } = data;
   if (!telegramId) return { success: false, message: "telegramId required" };
@@ -6676,6 +6750,7 @@ module.exports = {
   confirmJoinPrivateMarketHandler,
   disputeMarketHandler,
   getUserMarketsHandler,
+  closeMarketHandler,
   getUserWithdrawList,
   sweepUserDepositsHandler,
   addMarketLiquidityHandler,
@@ -6723,7 +6798,7 @@ async function addMarketLiquidityHandler(data) {
       return { status: false, message: `No ${chainKey} custodial wallet found for this user` };
     }
 
-    const userPrivateKey = common.decrypt(custodialWallet.privateKey);
+    const userPrivateKey = await common.decrypt(custodialWallet.privateKey);
 
     // On-chain balance verification
     const onChainBalance = await arkenEvm.getUsdtBalance(custodialWallet.address);
@@ -6809,7 +6884,7 @@ async function sellPositionHandler(data) {
       return { status: false, message: "No ARB custodial wallet found for this user" };
     }
 
-    const userPrivateKey = common.decrypt(arbWallet.privateKey);
+    const userPrivateKey = await common.decrypt(arbWallet.privateKey);
 
     // 4. Execute sell on-chain — reads shares from contract then calls sellOption()
     console.log(`[sellPosition] User ${telegramId} selling option ${prediction.outcomeIndex} in market ${market.arkenMarketAddress}`);
