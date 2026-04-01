@@ -21,7 +21,7 @@ const { KMSClient, EncryptCommand } = require("@aws-sdk/client-kms");
 const CryptoJS = require("crypto-js");
 
 // ─── Config ────────────────────────────────────────────────────────────────────
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI || process.env.DB_URL;
 const AWS_REGION = process.env.AWS_REGION || "us-east-1";
 const KMS_KEY_ID = process.env.KMS_KEY_ID;
 

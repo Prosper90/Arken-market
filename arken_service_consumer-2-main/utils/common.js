@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 var CryptoJS = require("crypto-js");
 const key = require("../config/key");
-const password = "RJ23edrf";
+const password = process.env.ADMIN_ENCRYPT_KEY || "RJ23edrf";
 
 
 const ENCRYPTION_KEY = key.ENCRYPTION_KEY;
