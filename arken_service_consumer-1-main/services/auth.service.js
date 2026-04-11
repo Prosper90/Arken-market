@@ -1477,6 +1477,57 @@ async function getCryptoPriceInUSDT(symbol) {
 // }
 
 
+// ─── UI normalization helper ──────────────────────────────────────────────────
+// Adds UI-friendly aliases used by the new mini-app frontend alongside the
+// existing fields so the old frontend continues to work unchanged.
+const OPTION_COLORS = [
+  "#f59e0b", "#0ea5e9", "#22c55e", "#ef4444",
+  "#a78bfa", "#f97316", "#14b8a6", "#e879f9",
+];
+
+function formatEnds(endDate) {
+  if (!endDate) return "";
+  const diff = new Date(endDate) - new Date();
+  if (diff <= 0) return "Ended";
+  const totalMins = Math.floor(diff / 60000);
+  const days  = Math.floor(totalMins / (60 * 24));
+  const hours = Math.floor((totalMins % (60 * 24)) / 60);
+  const mins  = totalMins % 60;
+  if (days  > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}m`;
+  return `${mins}m`;
+}
+
+function normalizeMarketForUI(item) {
+  const chancePercents = item.chancePercents || [50, 50];
+  const yes = Math.round(chancePercents[0] ?? 50);
+  const no  = 100 - yes;
+
+  const outcomes = Array.isArray(item.outcomes) ? item.outcomes : [];
+  const isMulti  = outcomes.length > 2;
+
+  const options = isMulti
+    ? outcomes.map((label, i) => ({
+        label,
+        prob: Math.round(chancePercents[i] ?? (100 / outcomes.length)),
+        color: OPTION_COLORS[i % OPTION_COLORS.length],
+      }))
+    : undefined;
+
+  return {
+    // aliases for new UI
+    title:  item.question,
+    tag:    item.category,
+    sub:    item.currency || item.subcategory || null,
+    yes,
+    no,
+    ends:   formatEnds(item.endDate),
+    type:   isMulti ? "multi" : "binary",
+    ...(options ? { options } : {}),
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function getMergedMarketsHandler(data) {
   try {
     const limit = Number(data?.limit) || 10;
@@ -1560,8 +1611,8 @@ async function getMergedMarketsHandler(data) {
     }
 
     await Market.updateMany(
-      { endDate: { $lt: new Date() }, active: true },
-      { $set: { active: false } }
+      { endDate: { $lt: new Date() }, active: true, marketStatus: 'active' },
+      { $set: { active: false, marketStatus: 'closed' } }
     );
 
     await polymarketDB.updateMany(
@@ -1577,8 +1628,7 @@ async function getMergedMarketsHandler(data) {
         : { isPrivate: { $ne: true } };
 
       const manualQuery = {
-        active: true,
-        endDate: { $gte: new Date() },
+        marketStatus: { $in: ['active', 'closed'] },
         ...privateFilter,
         ...cursorQuery,
         ...(manualOnly ? {} : categoryQuery),
@@ -1716,6 +1766,15 @@ async function getMergedMarketsHandler(data) {
       "events",
       "source",
       "createdAt",
+      "marketStatus",
+      "oracleType",
+      "umaStatus",
+      "umaAssertionId",
+      "umaVerdict",
+      "umaChallengePeriodEnd",
+      "umaSettledTxHash",
+      "creatorTelegramId",
+      "isPrivate",
     ];
 
     const finalData = merged.map((item) => {
@@ -1723,7 +1782,7 @@ async function getMergedMarketsHandler(data) {
       keysToKeep.forEach((k) => {
         if (item[k] !== undefined) filtered[k] = item[k];
       });
-      return filtered;
+      return { ...filtered, ...normalizeMarketForUI(filtered) };
     });
 
     const nextCursor =
@@ -1756,8 +1815,8 @@ async function getMergedMarketByIdHandler(data) {
     const objectId = new mongoose.Types.ObjectId(id);
 
     await Market.updateMany(
-      { endDate: { $lt: new Date() }, active: true },
-      { $set: { active: false } },
+      { endDate: { $lt: new Date() }, active: true, marketStatus: 'active' },
+      { $set: { active: false, marketStatus: 'closed' } },
     );
 
     await polymarketDB.updateMany(
@@ -1767,52 +1826,58 @@ async function getMergedMarketByIdHandler(data) {
 
     let market = await Market.findOne({
       _id: objectId,
-      active: true,
-      endDate: { $gte: new Date() },
+      marketStatus: { $ne: 'pending' },
     }).lean();
 
     if (market) {
+      const manualData = {
+        _id: market._id,
+        question: market.question,
+        description: market.description,
+        tags: market.tags,
+        image: market.image,
+        startDate: market.startDate,
+        conditionId: market.conditionId,
+        endDate: market.endDate,
+        liquidity: market.liquidity,
+        minimumLiquidity: market.minimumLiquidity,
+        estimatedNetworkFee: market.estimatedNetworkFee,
+        totalLiquidity: market.totalLiquidity,
+        totalDeduction: market.totalDeduction,
+        outcomes: market.outcomes,
+        outcomePrices: market.outcomePrices,
+        chancePercents: market.chancePercents,
+        bestBid: market.bestBid,
+        bestAsk: market.bestAsk,
+        resolution: market.resolution,
+        currency: market.currency,
+        active: market.active,
+        category: market.category,
+        closed: false,
+        archived: market.archived,
+        slug: market.slug,
+        specifyId: market.specifyId,
+        acceptingOrders: market.acceptingOrders,
+        events: market.events,
+        source: market.source || "manual",
+        marketStatus: market.marketStatus,
+        arkenMarketAddress: market.arkenMarketAddress || null,
+        solanaMarketId: market.solanaMarketId || null,
+        chain: market.chain || "EVM",
+        creatorTelegramId: market.creatorTelegramId || null,
+        oracleType: market.oracleType || "manual",
+        isPrivate: market.isPrivate || false,
+        createdAt: market.createdAt,
+        bondAmountUsdc: Number(process.env.UMA_BOND_AMOUNT || "0") / 1e18,
+        umaStatus: market.umaStatus || null,
+        umaAssertionId: market.umaAssertionId || null,
+        umaVerdict: market.umaVerdict || null,
+        umaChallengePeriodEnd: market.umaChallengePeriodEnd || null,
+        umaSettledTxHash: market.umaSettledTxHash || null,
+      };
       return {
         success: true,
-        data: {
-          _id: market._id,
-          question: market.question,
-          description: market.description,
-          tags: market.tags,
-          image: market.image,
-          startDate: market.startDate,
-          conditionId: market.conditionId,
-          endDate: market.endDate,
-          liquidity: market.liquidity,
-          minimumLiquidity: market.minimumLiquidity,
-          estimatedNetworkFee: market.estimatedNetworkFee,
-          totalLiquidity: market.totalLiquidity,
-          totalDeduction: market.totalDeduction,
-          outcomes: market.outcomes,
-          outcomePrices: market.outcomePrices,
-          chancePercents: market.chancePercents,
-          bestBid: market.bestBid,
-          bestAsk: market.bestAsk,
-          resolution: market.resolution,
-          currency: market.currency,
-          active: market.active,
-          category: market.category,
-          closed: false,
-          archived: market.archived,
-          slug: market.slug,
-          specifyId: market.specifyId,
-          acceptingOrders: market.acceptingOrders,
-          events: market.events,
-          source: market.source || "manual",
-          marketStatus: market.marketStatus,
-          arkenMarketAddress: market.arkenMarketAddress || null,
-          solanaMarketId: market.solanaMarketId || null,
-          chain: market.chain || "EVM",
-          creatorTelegramId: market.creatorTelegramId || null,
-          oracleType: market.oracleType || "manual",
-          isPrivate: market.isPrivate || false,
-          createdAt: market.createdAt,
-        },
+        data: { ...manualData, ...normalizeMarketForUI(manualData) },
       };
     }
 
@@ -1862,41 +1927,42 @@ async function getMergedMarketByIdHandler(data) {
       chancePercents = [50, 50];
     }
 
+    const polyData = {
+      _id: market._id,
+      question: market.question,
+      description: market.description,
+      tags: market.tags,
+      image: market.image,
+      startDate: market.startDate,
+      conditionId: market.conditionId,
+      endDate: market.endDate,
+      liquidity: market.liquidity,
+      outcomeTokenIds: market.outcomeTokenIds,
+      minimumLiquidity: market.minimumLiquidity,
+      estimatedNetworkFee: market.estimatedNetworkFee,
+      totalLiquidity: market.totalLiquidity,
+      totalDeduction: market.totalDeduction,
+      outcomes,
+      outcomePrices,
+      chancePercents,
+      bestBid: market.bestBid,
+      bestAsk: market.bestAsk,
+      resolution: market.resolution,
+      currency: market.currency,
+      active: market.active,
+      category: market.category,
+      closed: market.closed,
+      archived: market.archived,
+      slug: market.slug,
+      specifyId: market.specifyId,
+      acceptingOrders: market.acceptingOrders,
+      events: market.events,
+      source: "poly",
+      createdAt: market.createdAt,
+    };
     return {
       success: true,
-      data: {
-        _id: market._id,
-        question: market.question,
-        description: market.description,
-        tags: market.tags,
-        image: market.image,
-        startDate: market.startDate,
-        conditionId: market.conditionId,
-        endDate: market.endDate,
-        liquidity: market.liquidity,
-        outcomeTokenIds: market.outcomeTokenIds,
-        minimumLiquidity: market.minimumLiquidity,
-        estimatedNetworkFee: market.estimatedNetworkFee,
-        totalLiquidity: market.totalLiquidity,
-        totalDeduction: market.totalDeduction,
-        outcomes,
-        outcomePrices,
-        chancePercents,
-        bestBid: market.bestBid,
-        bestAsk: market.bestAsk,
-        resolution: market.resolution,
-        currency: market.currency,
-        active: market.active,
-        category: market.category,
-        closed: market.closed,
-        archived: market.archived,
-        slug: market.slug,
-        specifyId: market.specifyId,
-        acceptingOrders: market.acceptingOrders,
-        events: market.events,
-        source: "poly",
-        createdAt: market.createdAt,
-      },
+      data: { ...polyData, ...normalizeMarketForUI(polyData) },
     };
   } catch (error) {
     console.error("Error fetching merged market by id:", error);
@@ -2581,7 +2647,88 @@ async function userbetplaceHandler(data) {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // PATH B — Custodial bet (poly, manual off-chain)
+    // PATH B — Arken Solana on-chain bet (placeBet on ArkenMarket program)
+    // ═══════════════════════════════════════════════════════════════
+    if (source === "solana" && manualId && arkenSolana.isDeployed()) {
+      const amountNum = Number(amount);
+      if (!amountNum || amountNum <= 0) {
+        return { success: false, code: 400, message: "Invalid bet amount" };
+      }
+
+      // 1. MongoDB balance gate
+      const { balance: mongoBalance } = await getBalance(telegramId);
+      if (mongoBalance < amountNum) {
+        return {
+          success: false,
+          code: 400,
+          message: `Insufficient balance. You have $${mongoBalance.toFixed(2)}, need $${amountNum}`,
+        };
+      }
+
+      // 2. Get user's custodial SOL wallet
+      const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+      const solWallet = custodialDoc?.wallets?.find(
+        (w) => (w.network || "").toUpperCase() === "SOL"
+      );
+      if (!solWallet?.privateKey || !solWallet?.address) {
+        return { success: false, message: "No SOL custodial wallet found for this user" };
+      }
+
+      const userPrivateKey = await common.decrypt(solWallet.privateKey);
+
+      // 3. Place bet on-chain
+      const outcomeIdx = Number(outcomeIndex);
+      console.log(`[placeBet-SOL] User ${telegramId} betting $${amountNum} on option ${outcomeIdx} in market ${manualId}`);
+      const solResult = await arkenSolana.placeBet({
+        privateKey: userPrivateKey,
+        mongodbId: manualId.toString(),
+        optionIndex: outcomeIdx,
+        amountUsdc: amountNum,
+      });
+      console.log(`[placeBet-SOL] On-chain success. TxHash: ${solResult?.txHash}`);
+
+      // 4. Deduct MongoDB balance
+      await UserPublicWallet.updateOne(
+        { telegramId: String(telegramId) },
+        { $inc: { balance: -amountNum } }
+      );
+
+      // 5. Create prediction record
+      const shares = amountNum / (Number(odds) || 1);
+      const prediction = await Prediction.create({
+        userId: user._id,
+        telegramId,
+        groupId,
+        chatType,
+        manualId: manualId || null,
+        outcomeIndex: outcomeIdx,
+        outcomeLabel,
+        amount: amountNum,
+        odds: Number(odds) || 1,
+        shares,
+        avgPrice: Number(odds) || 1,
+        currentPrice: Number(odds) || 1,
+        potentialPayout: shares,
+        potentialProfit: shares - amountNum,
+        currency: "USDC",
+        deductedFrom: "userPublicWallet",
+        status: "OPEN",
+        source: "solana",
+        evmTxHash: solResult?.txHash || null,
+      });
+
+      user.totalPredictions += 1;
+      await user.save();
+
+      return {
+        success: true,
+        data: { ...prediction.toObject(), evmTxHash: solResult?.txHash },
+        message: "Bet placed on-chain (Solana) successfully",
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // PATH C — Custodial bet (poly, manual off-chain)
     // ═══════════════════════════════════════════════════════════════
 
     // --- Fee calculation ---
@@ -6137,13 +6284,14 @@ async function createUserMarketHandler(data) {
         const userPrivateKey = await common.decrypt(arbWallet.privateKey);
         const endTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
 
-        // Step 1: User's key calls the factory — they are the on-chain creator
-        console.log(`[createMarket] Deploying EVM market for ${market._id} (user signer)...`);
+        // Step 1: Admin key calls the factory (onlyOwner guard), user address recorded as on-chain creator
+        console.log(`[createMarket] Deploying EVM market for ${market._id} (admin signer, user creator)...`);
         const { txHash, marketAddress } = await arkenEvm.createMarket({
-          adminPrivateKey: userPrivateKey,
+          adminPrivateKey: process.env.EVM_PRIVATE_KEY,
           mongodbId: market._id.toString(),
           endTimestamp,
           outcomeCount,
+          creatorAddress: arbWallet.address,
         });
         console.log(`[createMarket] Deployed at ${marketAddress} (tx: ${txHash})`);
 
@@ -6229,6 +6377,7 @@ async function createUserMarketHandler(data) {
         mongodbId: market._id.toString(),
         endTimestamp,
         outcomeCount,
+        creatorAddress: market.creatorWalletSol || null,
       });
 
       if (!solResult) throw new Error("createMarket returned null — check ARKEN_PROGRAM_ID");
@@ -6263,6 +6412,7 @@ async function createUserMarketHandler(data) {
       };
     } catch (chainErr) {
       console.error("[createMarket] SOL chain deployment failed:", chainErr.message);
+      console.error("[createMarket] Stack:", chainErr.stack);
       await Market.deleteOne({ _id: market._id });
       return { status: false, message: `SOL market creation failed: ${chainErr.message}` };
     }
@@ -6279,23 +6429,45 @@ async function createUserMarketHandler(data) {
  */
 async function submitUMAAssertionHandler(data) {
   try {
-    const { marketId, proposedOutcome } = data;
+    const { marketId, proposedOutcome, telegramId } = data;
 
     if (!marketId || !proposedOutcome) {
       return { status: false, message: "marketId and proposedOutcome are required" };
     }
+    if (!telegramId) {
+      return { status: false, message: "telegramId is required" };
+    }
 
     const market = await Market.findById(marketId);
     if (!market) return { status: false, message: "Market not found" };
-    if (market.oracleType !== "uma") {
-      return { status: false, message: "Market is not UMA oracle type" };
+    if (new Date() < new Date(market.endDate)) {
+      return { status: false, message: "Market has not ended yet" };
     }
     if (market.umaStatus && market.umaStatus !== "none") {
-      return { status: false, message: `Assertion already ${market.umaStatus}` };
+      return { status: false, message: `Resolution already ${market.umaStatus} — cannot propose again` };
+    }
+    if (market.marketStatus === "resolved") {
+      return { status: false, message: "Market is already resolved" };
     }
 
+    // Proposer pays the bond from their custodial EVM wallet
+    const user = await usersDB.findOne({ telegramId: Number(telegramId?.telegramId ?? telegramId) });
+    if (!user) return { status: false, message: "User not found" };
+
+    const normalizedId = String(telegramId?.telegramId ?? telegramId);
+    const walletDoc = await userPublicWallet.findOne({ telegramId: normalizedId });
+    const arbWallet = walletDoc?.wallets?.find(w => w.network === "ARB" || w.network === "EVM");
+    if (!arbWallet?.privateKey) {
+      return {
+        status: false,
+        message: "No EVM wallet found. Please ensure your platform wallet is set up.",
+      };
+    }
+    const proposerKey = await common.decrypt(arbWallet.privateKey);
+    console.log(`[UMA] Proposer wallet: ${arbWallet.address}`);
+
     const { submitUMAAssertion } = require("./uma.service");
-    const result = await submitUMAAssertion(marketId, proposedOutcome);
+    const result = await submitUMAAssertion(marketId, proposedOutcome, proposerKey);
 
     await Market.findByIdAndUpdate(marketId, {
       umaAssertionId: result.assertionId,
@@ -6303,18 +6475,20 @@ async function submitUMAAssertionHandler(data) {
       umaSubmittedAt: new Date(),
       umaChallengePeriodEnd: result.challengeEnd,
       umaStatus: "submitted",
+      // Stamp oracleType as uma so cron picks it up for settlement
+      oracleType: "uma",
     });
 
-    const isTestnet = (process.env.ARB_RPC_URL || "").includes("sepolia");
-    const arbiscanBase = isTestnet ? "https://sepolia.arbiscan.io" : "https://arbiscan.io";
-    const arbiscanLink = `${arbiscanBase}/tx/${result.txHash}`;
+    const isTestnet = (process.env.ARB_RPC || "").includes("sepolia");
+    const etherscanBase = isTestnet ? "https://sepolia.etherscan.io" : "https://etherscan.io";
+    const explorerLink = `${etherscanBase}/tx/${result.txHash}`;
 
     return {
       status: true,
       success: true,
       assertionId: result.assertionId,
       txHash: result.txHash,
-      arbiscanLink,
+      explorerLink,
       challengeEnd: result.challengeEnd,
     };
   } catch (error) {
@@ -6713,6 +6887,149 @@ async function sweepUserDepositsHandler(data) {
   }
 }
 
+/**
+ * linkEmailHandler
+ * Step 1: user provides email → OTP sent → stored on user record.
+ */
+async function linkEmailHandler(data) {
+  try {
+    const { telegramId, email } = data;
+    if (!telegramId || !email) return { status: false, message: "telegramId and email required" };
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return { status: false, message: "Invalid email address" };
+
+    // Check email not already used by another account
+    const existing = await usersDB.findOne({ email: email.toLowerCase(), telegramId: { $ne: telegramId } });
+    if (existing) return { status: false, message: "Email already linked to another account" };
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 min
+
+    await usersDB.findOneAndUpdate(
+      { telegramId },
+      { emailOtp: otp, emailOtpExpiry: expiry },
+    );
+
+    await mail.sendEMail({
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: "Arken — Email Verification Code",
+      html: `<p>Your Arken verification code is: <strong>${otp}</strong></p><p>It expires in 10 minutes.</p>`,
+    });
+
+    return { status: true, success: true, message: "OTP sent to your email" };
+  } catch (error) {
+    console.error("linkEmailHandler error:", error);
+    return { status: false, message: error.message || "Something went wrong" };
+  }
+}
+
+/**
+ * verifyEmailOtpHandler
+ * Step 2: user provides OTP → email linked → encrypted backup sent.
+ */
+async function verifyEmailOtpHandler(data) {
+  try {
+    const { telegramId, email, otp } = data;
+    if (!telegramId || !email || !otp) return { status: false, message: "telegramId, email and otp required" };
+
+    const user = await usersDB.findOne({ telegramId });
+    if (!user) return { status: false, message: "User not found" };
+    if (!user.emailOtp || user.emailOtp !== otp) return { status: false, message: "Invalid OTP" };
+    if (!user.emailOtpExpiry || new Date() > new Date(user.emailOtpExpiry)) return { status: false, message: "OTP expired" };
+
+    await usersDB.findOneAndUpdate(
+      { telegramId },
+      { email: email.toLowerCase(), emailVerified: true, emailOtp: null, emailOtpExpiry: null }
+    );
+
+    // Send wallet backup notification email
+    await mail.sendEMail({
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: "Arken — Email Linked Successfully",
+      html: `<p>Your email has been linked to your Arken account (Telegram ID: ${telegramId}).</p><p>If you ever lose access to your Telegram account, use this email to recover your wallet.</p>`,
+    });
+
+    return { status: true, success: true, message: "Email linked successfully" };
+  } catch (error) {
+    console.error("verifyEmailOtpHandler error:", error);
+    return { status: false, message: error.message || "Something went wrong" };
+  }
+}
+
+/**
+ * initiateAccountRecoveryHandler
+ * Recovery step 1: user provides email → OTP sent to that email.
+ */
+async function initiateAccountRecoveryHandler(data) {
+  try {
+    const { email } = data;
+    if (!email) return { status: false, message: "email required" };
+
+    const user = await usersDB.findOne({ email: email.toLowerCase(), emailVerified: true });
+    if (!user) return { status: false, message: "No verified account found with this email" };
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    await usersDB.findOneAndUpdate({ _id: user._id }, { emailOtp: otp, emailOtpExpiry: expiry });
+
+    await mail.sendEMail({
+      from: process.env.FROM_EMAIL,
+      to: email,
+      subject: "Arken — Account Recovery Code",
+      html: `<p>Your Arken account recovery code is: <strong>${otp}</strong></p><p>It expires in 10 minutes. If you did not request this, ignore this email.</p>`,
+    });
+
+    return { status: true, success: true, message: "Recovery OTP sent to your email" };
+  } catch (error) {
+    console.error("initiateAccountRecoveryHandler error:", error);
+    return { status: false, message: error.message || "Something went wrong" };
+  }
+}
+
+/**
+ * confirmAccountRecoveryHandler
+ * Recovery step 2: OTP verified → old telegramId replaced with new one.
+ */
+async function confirmAccountRecoveryHandler(data) {
+  try {
+    const { email, otp, newTelegramId } = data;
+    if (!email || !otp || !newTelegramId) return { status: false, message: "email, otp and newTelegramId required" };
+
+    const user = await usersDB.findOne({ email: email.toLowerCase(), emailVerified: true });
+    if (!user) return { status: false, message: "No verified account found with this email" };
+    if (!user.emailOtp || user.emailOtp !== otp) return { status: false, message: "Invalid OTP" };
+    if (!user.emailOtpExpiry || new Date() > new Date(user.emailOtpExpiry)) return { status: false, message: "OTP expired" };
+
+    const oldTelegramId = user.telegramId;
+
+    // Check new telegram ID not already in use
+    const conflict = await usersDB.findOne({ telegramId: newTelegramId });
+    if (conflict && conflict._id.toString() !== user._id.toString()) {
+      return { status: false, message: "New Telegram ID is already registered" };
+    }
+
+    // Relink user record + wallet to new telegram ID
+    await usersDB.findOneAndUpdate(
+      { _id: user._id },
+      { telegramId: newTelegramId, emailOtp: null, emailOtpExpiry: null }
+    );
+    await userPublicWallet.findOneAndUpdate(
+      { telegramId: oldTelegramId },
+      { telegramId: newTelegramId }
+    );
+
+    console.log(`[RECOVERY] telegramId relinked: ${oldTelegramId} → ${newTelegramId} via email ${email}`);
+    return { status: true, success: true, message: "Account recovered. Your wallet is now linked to your new Telegram account." };
+  } catch (error) {
+    console.error("confirmAccountRecoveryHandler error:", error);
+    return { status: false, message: error.message || "Something went wrong" };
+  }
+}
+
 module.exports = {
   getMergedMarketsHandler,
   getCompletedBetsForUserHandler,
@@ -6755,6 +7072,10 @@ module.exports = {
   sweepUserDepositsHandler,
   addMarketLiquidityHandler,
   sellPositionHandler,
+  linkEmailHandler,
+  verifyEmailOtpHandler,
+  initiateAccountRecoveryHandler,
+  confirmAccountRecoveryHandler,
 };
 
 /**
@@ -6774,8 +7095,10 @@ async function addMarketLiquidityHandler(data) {
 
     const market = await Market.findById(marketId).lean();
     if (!market) return { status: false, message: "Market not found" };
-    if (market.source !== "arken" || !market.arkenMarketAddress) {
-      return { status: false, message: "Liquidity can only be added to Arken EVM markets" };
+    const isSolanaLp = market.source === "solana";
+    const isEvmLp    = market.source === "arken" && !!market.arkenMarketAddress;
+    if (!isSolanaLp && !isEvmLp) {
+      return { status: false, message: "Liquidity can only be added to Arken on-chain markets" };
     }
     if (market.marketStatus !== "active") {
       return { status: false, message: "Market is not active" };
@@ -6787,35 +7110,50 @@ async function addMarketLiquidityHandler(data) {
       return { status: false, message: `Insufficient balance. You have $${userBalance.toFixed(2)}, need $${amountNum}` };
     }
 
-    // Derive chain from market (arken = EVM/ARB, solana = SOL)
+    // Get user's custodial wallet for the relevant chain
     const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
-    const chainKey = (market.chain || "EVM").toUpperCase();
-    const custodialWallet = chainKey === "SOL"
-      ? custodialDoc?.wallets?.find(w => (w.network || "").toUpperCase().includes("SOL"))
-      : custodialDoc?.wallets?.find(w => (w.network || "").toUpperCase().includes("ARB"));
+    const networkTag = isSolanaLp ? "SOL" : "ARB";
+    const custodialWallet = custodialDoc?.wallets?.find(
+      w => (w.network || "").toUpperCase() === networkTag
+    );
 
     if (!custodialWallet?.privateKey || !custodialWallet?.address) {
-      return { status: false, message: `No ${chainKey} custodial wallet found for this user` };
+      return { status: false, message: `No ${networkTag} custodial wallet found for this user` };
     }
 
     const userPrivateKey = await common.decrypt(custodialWallet.privateKey);
 
-    // On-chain balance verification
-    const onChainBalance = await arkenEvm.getUsdtBalance(custodialWallet.address);
-    if (onChainBalance < amountNum) {
-      return {
-        status: false,
-        message: `Insufficient on-chain USDT. Wallet holds $${onChainBalance.toFixed(2)}, need $${amountNum}`,
-      };
-    }
+    let txHash;
 
-    // Add liquidity on-chain — calls addLiquidity(amount) on ArkenMarket
-    console.log(`[addLiquidity] User ${telegramId} adding $${amountNum} USDT to market ${market.arkenMarketAddress}`);
-    const { txHash } = await arkenEvm.seedLiquidity({
-      adminPrivateKey: userPrivateKey,
-      marketAddress: market.arkenMarketAddress,
-      amountUsdt: amountNum,
-    });
+    if (isSolanaLp) {
+      if (!arkenSolana.isDeployed()) {
+        return { status: false, message: "Solana program not deployed" };
+      }
+      console.log(`[addLiquidity-SOL] User ${telegramId} adding $${amountNum} USDC to market ${market._id}`);
+      const solResult = await arkenSolana.addLiquidity({
+        privateKey: userPrivateKey,
+        mongodbId: market._id.toString(),
+        amountUsdc: amountNum,
+      });
+      txHash = solResult?.txHash;
+    } else {
+      // On-chain balance verification for EVM
+      const onChainBalance = await arkenEvm.getUsdtBalance(custodialWallet.address);
+      if (onChainBalance < amountNum) {
+        return {
+          status: false,
+          message: `Insufficient on-chain USDT. Wallet holds $${onChainBalance.toFixed(2)}, need $${amountNum}`,
+        };
+      }
+      // Add liquidity on-chain — calls addLiquidity(amount) on ArkenMarket
+      console.log(`[addLiquidity-EVM] User ${telegramId} adding $${amountNum} USDT to market ${market.arkenMarketAddress}`);
+      const evmResult = await arkenEvm.seedLiquidity({
+        adminPrivateKey: userPrivateKey,
+        marketAddress: market.arkenMarketAddress,
+        amountUsdt: amountNum,
+      });
+      txHash = evmResult?.txHash;
+    }
     console.log(`[addLiquidity] Success — tx: ${txHash}`);
 
     await UserPublicWallet.updateOne(
@@ -6850,7 +7188,7 @@ async function addMarketLiquidityHandler(data) {
  */
 async function sellPositionHandler(data) {
   try {
-    const { telegramId, predictionId } = data;
+    const { telegramId, predictionId, sellPercentage } = data;
     if (!telegramId) return { status: false, message: "telegramId required" };
     if (!predictionId) return { status: false, message: "predictionId required" };
 
@@ -6860,65 +7198,111 @@ async function sellPositionHandler(data) {
     if (Number(prediction.telegramId) !== Number(telegramId)) {
       return { status: false, message: "Unauthorized: not your prediction" };
     }
-    if (prediction.source !== "arken") {
-      return { status: false, message: "Sell is only available for Arken EVM positions" };
+    const isSolanaMarket = prediction.source === "solana" || prediction.source === "arken-sol";
+    const isEvmMarket   = prediction.source === "arken";
+    if (!isSolanaMarket && !isEvmMarket) {
+      return { status: false, message: "Sell is only available for Arken on-chain positions" };
     }
     if (prediction.status !== "OPEN") {
       return { status: false, message: "Position is not open" };
     }
 
-    // 2. Find the market to get arkenMarketAddress
+    // 2. Find the market
     const market = await Market.findById(prediction.manualId).lean();
     if (!market) return { status: false, message: "Market not found" };
-    if (!market.arkenMarketAddress) return { status: false, message: "No on-chain market address" };
     if (market.marketStatus !== "active") {
       return { status: false, message: "Market is not active — cannot sell" };
     }
 
-    // 3. Get custodial ARB wallet
+    // 3. Get custodial wallet for the relevant chain
     const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
-    const arbWallet = custodialDoc?.wallets?.find(
-      (w) => (w.network || "").toUpperCase().includes("ARB")
+    const networkTag = isSolanaMarket ? "SOL" : "ARB";
+    const chainWallet = custodialDoc?.wallets?.find(
+      (w) => (w.network || "").toUpperCase().includes(networkTag)
     );
-    if (!arbWallet?.privateKey || !arbWallet?.address) {
-      return { status: false, message: "No ARB custodial wallet found for this user" };
+    if (!chainWallet?.privateKey || !chainWallet?.address) {
+      return { status: false, message: `No ${networkTag} custodial wallet found for this user` };
     }
 
-    const userPrivateKey = await common.decrypt(arbWallet.privateKey);
+    const userPrivateKey = await common.decrypt(chainWallet.privateKey);
 
-    // 4. Execute sell on-chain — reads shares from contract then calls sellOption()
-    console.log(`[sellPosition] User ${telegramId} selling option ${prediction.outcomeIndex} in market ${market.arkenMarketAddress}`);
-    const { txHash, payout } = await arkenEvm.sellPosition({
-      privateKey: userPrivateKey,
-      marketAddress: market.arkenMarketAddress,
-      optionIndex: Number(prediction.outcomeIndex),
-    });
-    console.log(`[sellPosition] On-chain success. TxHash: ${txHash}, payout: ${payout} USDT`);
+    // Clamp sellPercentage to 1-100 (default 100 = full sell)
+    const pct = sellPercentage && Number(sellPercentage) > 0
+      ? Math.min(100, Math.max(1, Math.round(Number(sellPercentage))))
+      : 100;
+    const isFullSell = pct >= 100;
 
-    // 5. Chain confirmed — credit MongoDB balance with actual payout
-    await UserPublicWallet.updateOne(
-      { telegramId: String(telegramId) },
-      { $inc: { balance: payout } }
-    );
+    // 4. Execute sell on-chain
+    let txHash, payout;
 
-    // 6. Mark prediction as CLOSED
-    await Prediction.updateOne(
-      { _id: predictionId },
-      {
-        status: "CLOSED",
-        finalPayout: payout,
-        settledAt: new Date(),
-        resolvedOutcome: "Sold",
-        evmTxHash: txHash,
+    if (isSolanaMarket) {
+      if (!arkenSolana.isDeployed()) {
+        return { status: false, message: "Solana program not deployed" };
       }
-    );
+      console.log(`[sellPosition] Solana: User ${telegramId} selling ${pct}% of market ${market._id}`);
+      const solResult = await arkenSolana.sellPosition({
+        privateKey: userPrivateKey,
+        mongodbId: market._id.toString(),
+        sellPercentage: pct,
+      });
+      txHash  = solResult.txHash;
+      payout  = 0; // Solana: payout not easily extractable from tx — use estimate
+    } else {
+      if (!market.arkenMarketAddress) return { status: false, message: "No EVM market address" };
+      console.log(`[sellPosition] EVM: User ${telegramId} selling ${pct}% of option ${prediction.outcomeIndex} in ${market.arkenMarketAddress}`);
+      const evmResult = await arkenEvm.sellPosition({
+        privateKey: userPrivateKey,
+        marketAddress: market.arkenMarketAddress,
+        optionIndex: Number(prediction.outcomeIndex),
+        sellPercentage: pct,
+      });
+      txHash  = evmResult.txHash;
+      payout  = evmResult.payout;
+    }
+    console.log(`[sellPosition] On-chain success. TxHash: ${txHash}, payout: ${payout}`);
+
+    // 5. Chain confirmed — credit MongoDB balance
+    if (payout > 0) {
+      await UserPublicWallet.updateOne(
+        { telegramId: String(telegramId) },
+        { $inc: { balance: payout } }
+      );
+    }
+
+    const txField = isSolanaMarket ? "solanaTxHash" : "evmTxHash";
+
+    // 6. Full sell → CLOSED. Partial sell → stay OPEN with reduced amount.
+    if (isFullSell) {
+      await Prediction.updateOne(
+        { _id: predictionId },
+        {
+          status: "CLOSED",
+          finalPayout: payout,
+          settledAt: new Date(),
+          resolvedOutcome: "Sold",
+          [txField]: txHash,
+        }
+      );
+    } else {
+      const remainingFraction = 1 - pct / 100;
+      await Prediction.updateOne(
+        { _id: predictionId },
+        {
+          $mul: { betAmount: remainingFraction, amount: remainingFraction },
+          $inc: { partialPayouts: payout },
+          $set: { [txField]: txHash },
+        }
+      );
+    }
 
     return {
       status: true,
       success: true,
       txHash,
       payout,
-      message: `Position sold. You received $${payout.toFixed(4)} USDT`,
+      sellPercentage: pct,
+      isFullSell,
+      message: `${isFullSell ? "Position sold" : `${pct}% sold`}. You received $${payout.toFixed(4)} USDT`,
     };
   } catch (error) {
     console.error("sellPositionHandler error:", error.message);

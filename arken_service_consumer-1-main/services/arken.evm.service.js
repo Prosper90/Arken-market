@@ -9,8 +9,8 @@ const { ethers } = require("ethers");
 // ─── ABIs ────────────────────────────────────────────────────────────────────
 
 const MARKET_ABI = [
-  "function buyOption(uint8 option, uint256 amount) external",
-  "function sellOption(uint8 option, uint256 shareAmount) external",
+  "function buyOption(uint8 option, uint256 amount, address referrer) external",
+  "function sellOption(uint8 option, uint256 shareAmount, address referrer) external",
   "function resolveMarket(uint8 winningOption) external",
   "function claimWinnings() external",
   "function closeMarket() external",
@@ -26,7 +26,7 @@ const MARKET_ABI = [
   "function status() view returns (uint8)",
   "function endTime() view returns (uint256)",
   "function authority() view returns (address)",
-  "event ExitOption(address indexed user, uint8 indexed option, uint256 sharesSold, uint256 payout)",
+  "event ExitOption(address indexed user, uint8 indexed option, uint256 sharesSold, uint256 payout, address referrer)",
 ];
 
 const ERC20_ABI = [
@@ -36,10 +36,10 @@ const ERC20_ABI = [
 ];
 
 const FACTORY_ABI = [
-  "function createMarket(bytes32 marketId, uint256 endTime, uint8 outcomeCount) external returns (address)",
+  "function createMarket(bytes32 marketId, uint256 endTime, uint8 outcomeCount, string[] calldata outcomeNames, address creator) external returns (address)",
   "function getAllMarkets() view returns (address[])",
   "function marketById(bytes32) view returns (address)",
-  "event MarketCreated(address indexed market, bytes32 indexed marketId, uint256 endTime, uint8 outcomeCount)",
+  "event MarketCreated(address indexed market, bytes32 indexed marketId, uint256 endTime, uint8 outcomeCount, address creator)",
 ];
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@ function getFactoryContract(signerOrProvider) {
  * @param {number} params.amountUsdt          - Human-readable USDT amount (e.g. 10.5)
  * @returns {Promise<{ txHash: string, walletAddress: string }>}
  */
-async function placeBet({ privateKey, marketAddress, optionIndex, amountUsdt }) {
+async function placeBet({ privateKey, marketAddress, optionIndex, amountUsdt, referrer }) {
   if (!privateKey) throw new Error("No private key provided");
   if (!marketAddress) throw new Error("No market address provided");
   if (typeof optionIndex !== "number" || optionIndex < 0) throw new Error("Invalid option index");
@@ -101,11 +101,12 @@ async function placeBet({ privateKey, marketAddress, optionIndex, amountUsdt }) 
     console.log("[ArkenEVM] USDT approved");
   }
 
-  // Step 2: Buy option
+  // Step 2: Buy option (referrer address or zero address)
   const market = getMarketContract(marketAddress, signer);
-  console.log(`[ArkenEVM] Placing bet: option=${optionIndex}, amount=${amountUsdt} USDT`);
+  const referrerAddr = referrer || ethers.ZeroAddress;
+  console.log(`[ArkenEVM] Placing bet: option=${optionIndex}, amount=${amountUsdt} USDT, referrer=${referrerAddr}`);
 
-  const buyTx = await market.buyOption(optionIndex, amountWei);
+  const buyTx = await market.buyOption(optionIndex, amountWei, referrerAddr);
   const receipt = await buyTx.wait(1);
 
   console.log("[ArkenEVM] Bet placed. TxHash:", receipt.hash);
@@ -127,7 +128,7 @@ async function placeBet({ privateKey, marketAddress, optionIndex, amountUsdt }) 
  * @param {number} params.endTimestamp      - Unix timestamp (seconds)
  * @returns {Promise<{ txHash: string, marketAddress: string }>}
  */
-async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeCount }) {
+async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeCount, outcomeNames, creatorAddress }) {
   const signer = getSignerFromPrivateKey(adminPrivateKey);
   const factory = getFactoryContract(signer);
 
@@ -138,7 +139,9 @@ async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeC
   );
 
   const resolvedOutcomeCount = outcomeCount || 2;
-  const tx = await factory.createMarket(marketIdBytes, endTimestamp, resolvedOutcomeCount);
+  const names = outcomeNames || (resolvedOutcomeCount === 2 ? ["Yes", "No"] : Array.from({ length: resolvedOutcomeCount }, (_, i) => `Opt${i}`));
+  const creatorAddr = creatorAddress || ethers.ZeroAddress;
+  const tx = await factory.createMarket(marketIdBytes, endTimestamp, resolvedOutcomeCount, names, creatorAddr);
   const receipt = await tx.wait(1);
 
   // Parse MarketCreated event to get market address
@@ -276,7 +279,7 @@ async function getUsdtBalance(address) {
 // ─── User: Sell Position ──────────────────────────────────────────────────────
 
 /**
- * Sell all shares for a given option, receiving proportional USDT payout (minus 3% fee).
+ * Sell shares for a given option, receiving proportional USDT payout (minus 3% fee).
  * Reads the user's on-chain share balance first, then calls sellOption().
  * Parses the ExitOption event to return the actual USDT payout received.
  *
@@ -284,9 +287,10 @@ async function getUsdtBalance(address) {
  * @param {string} params.privateKey      - User's custodial Arbitrum private key
  * @param {string} params.marketAddress   - ArkenMarket contract address
  * @param {number} params.optionIndex     - Outcome index to sell (0=Yes, 1=No, ...)
+ * @param {number} [params.sellPercentage] - Percentage of position to sell (1-100). Defaults to 100 (full sell).
  * @returns {Promise<{ txHash: string, walletAddress: string, payout: number }>}
  */
-async function sellPosition({ privateKey, marketAddress, optionIndex }) {
+async function sellPosition({ privateKey, marketAddress, optionIndex, sellPercentage, referrer }) {
   if (!privateKey) throw new Error("No private key provided");
   if (!marketAddress) throw new Error("No market address provided");
   if (typeof optionIndex !== "number" || optionIndex < 0) throw new Error("Invalid option index");
@@ -298,15 +302,22 @@ async function sellPosition({ privateKey, marketAddress, optionIndex }) {
   const sharesWei = await market.getUserShares(signer.address, optionIndex);
   if (sharesWei === 0n) throw new Error("No on-chain shares found for this position");
 
-  console.log(`[ArkenEVM] Selling ${ethers.formatUnits(sharesWei, USDT_DECIMALS)} shares on option ${optionIndex}`);
+  // Determine how many shares to sell based on percentage (default 100%)
+  const pct = sellPercentage && Number(sellPercentage) > 0
+    ? Math.min(100, Math.max(1, Math.round(Number(sellPercentage))))
+    : 100;
+  const sharesToSellWei = pct === 100 ? sharesWei : (sharesWei * BigInt(pct)) / 100n;
+
+  console.log(`[ArkenEVM] Selling ${pct}% (${ethers.formatUnits(sharesToSellWei, USDT_DECIMALS)} of ${ethers.formatUnits(sharesWei, USDT_DECIMALS)} shares) on option ${optionIndex}`);
 
   // Execute the sell — no USDT approval needed (contract pays us)
-  const sellTx = await market.sellOption(optionIndex, sharesWei);
+  const referrerAddr = referrer || ethers.ZeroAddress;
+  const sellTx = await market.sellOption(optionIndex, sharesToSellWei, referrerAddr);
   const receipt = await sellTx.wait(1);
 
   // Parse ExitOption event for actual USDT payout
   const iface = new ethers.Interface([
-    "event ExitOption(address indexed user, uint8 indexed option, uint256 sharesSold, uint256 payout)",
+    "event ExitOption(address indexed user, uint8 indexed option, uint256 sharesSold, uint256 payout, address referrer)",
   ]);
 
   let payout = 0;

@@ -44,6 +44,10 @@ addMarketLiquidity: "user/addMarketLiquidity",
 sweepDeposits: "user/sweepDeposits",
 sellPosition: "user/sellPosition",
 closeMarket: "user/closeMarket",
+linkEmail: "user/linkEmail",
+verifyEmailOtp: "user/verifyEmailOtp",
+initiateAccountRecovery: "user/initiateAccountRecovery",
+confirmAccountRecovery: "user/confirmAccountRecovery",
 
 };
 

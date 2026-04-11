@@ -21,31 +21,53 @@ const FACTORY_ABI = [
 ];
 
 const MARKET_ABI = [
+  // ── State views ──────────────────────────────────────────────────────────
   "function marketId() view returns (bytes32)",
   "function endTime() view returns (uint256)",
   "function outcomeCount() view returns (uint8)",
   "function status() view returns (uint8)",
   "function winningOption() view returns (uint8)",
-  "function platformFeePool() view returns (uint256)",
-  "function lpFeePool() view returns (uint256)",
   "function totalLpDeposit() view returns (uint256)",
+  // Fee pools
+  "function creatorFeePool() view returns (uint256)",
+  "function lpFeePool() view returns (uint256)",
+  "function treasuryFeePool() view returns (uint256)",
+  "function referralBalance(address) view returns (uint256)",
+  // Resolution snapshot
+  "function resolvedTotalPool() view returns (uint256)",
+  "function resolvedWinningSupply() view returns (uint256)",
+  "function resolvedLpWinningSeeds() view returns (uint256)",
+  // ── Compound views ───────────────────────────────────────────────────────
   "function getPrice() view returns (uint256 p0, uint256 p1)",
   "function getTotalPool() view returns (uint256)",
-  "function getMarketInfo() view returns (bytes32, uint256, uint8, uint8, uint8, uint256, uint256, uint256, uint256)",
   "function getPrices() view returns (uint256[] memory)",
-  "function addLiquidity(uint256 amount) external",
-  "function claimLpPosition() external",
-  "function getLpInfo(address provider) view returns (uint256, uint256, bool)",
   "function getPool(uint8 outcome) view returns (uint256)",
   "function getUserShares(address user, uint8 outcome) view returns (uint256)",
-  "function buyOption(uint8 option, uint256 amount)",
-  "function resolveMarket(uint8 winningOption)",
-  "function claimWinnings()",
-  "function closeMarket()",
-  "event EnterOption(address indexed user, uint8 indexed option, uint256 amountIn, uint256 shares)",
-  "event ChooseWinner(uint8 winningOption)",
-  "event ClosePool()",
-  "event Claim(address indexed user, uint256 payout)",
+  "function getOutcomeToken(uint8 outcome) view returns (address)",
+  "function getLpInfo(address provider) view returns (uint256 deposited, uint256 estimatedFeeShare, bool hasClaimed)",
+  "function getMarketInfo() view returns (bytes32 _marketId, uint256 _endTime, uint8 _outcomeCount, uint8 _status, uint8 _winningOption, uint256 totalPool, uint256 _totalLpDeposit, uint256 _creatorFeePool, uint256 _lpFeePool)",
+  // ── Write ────────────────────────────────────────────────────────────────
+  "function addLiquidity(uint256 amount) external",
+  "function buyOption(uint8 option, uint256 amount, address referrer) external",
+  "function sellOption(uint8 option, uint256 shareAmount, address referrer) external",
+  "function resolveMarket(uint8 _winningOption) external",
+  "function closeMarket() external",
+  "function claimWinnings() external",
+  "function claimLpPosition() external",
+  "function claimReferralFees() external",
+  "function claimCreatorFees() external",
+  "function claimTreasuryFees() external",
+  // ── Events ───────────────────────────────────────────────────────────────
+  "event EnterOption(address indexed user, uint8 indexed option, uint256 amountIn, uint256 netShares, address referrer)",
+  "event ExitOption(address indexed user, uint8 indexed option, uint256 sharesSold, uint256 payout, address referrer)",
+  "event MarketResolved(uint8 winningOption)",
+  "event MarketClosed()",
+  "event WinningsClaimed(address indexed user, uint256 payout)",
+  "event LiquidityAdded(address indexed provider, uint256 amount)",
+  "event LiquidityClaimed(address indexed provider, uint256 seedReturn, uint256 feeReturn)",
+  "event ReferralClaimed(address indexed referrer, uint256 amount)",
+  "event CreatorFeesClaimed(address indexed creator, uint256 amount)",
+  "event TreasuryFeesClaimed(address indexed treasury, uint256 amount)",
 ];
 
 const ERC20_ABI = [
@@ -100,7 +122,7 @@ export async function getArkenMarkets() {
 export async function fetchArkenMarket(marketAddress) {
   try {
     const market = getMarket(marketAddress);
-    const [marketIdBytes, endTime, outcomeCount, status, winningOption, totalPoolWei] =
+    const [marketIdBytes, endTime, outcomeCount, status, winningOption, totalPoolWei, totalLpDepositWei, creatorFeePoolWei, lpFeePoolWei] =
       await market.getMarketInfo();
 
     const totalPool = Number(ethers.formatUnits(totalPoolWei, USDT_DECIMALS));
@@ -137,6 +159,9 @@ export async function fetchArkenMarket(marketAddress) {
       arkenMarketAddress: marketAddress,
       arkenMarketId: marketIdHex,
       winningOption: status === 2 ? Number(winningOption) : null,
+      totalLpDeposit: Number(ethers.formatUnits(totalLpDepositWei, USDT_DECIMALS)),
+      creatorFeePool: Number(ethers.formatUnits(creatorFeePoolWei, USDT_DECIMALS)),
+      lpFeePool: Number(ethers.formatUnits(lpFeePoolWei, USDT_DECIMALS)),
     };
   } catch (err) {
     console.error(`[Arken] fetchArkenMarket(${marketAddress}) failed:`, err?.message);

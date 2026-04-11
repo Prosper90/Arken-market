@@ -52,6 +52,9 @@ services:
     environment:
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       REDIS_HOST: redis
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       rabbitmq:
         condition: service_healthy

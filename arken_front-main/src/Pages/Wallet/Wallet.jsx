@@ -1,713 +1,488 @@
-import React, { useState, useEffect } from "react";
-import { moderateScale } from "../../utils/Scale";
-import ImageComponent from "../../Components/ImageComponent";
-import BottomTab from "../BottomTab/BottomTab";
-import wllt_top_img from "../../assets/image/wllt_top_img.webp";
-import wllt_img from "../../assets/image/wllt_img.webp";
-import obrd_middl_wllImg1 from "../../assets/image/obrd_middl_wllImg1.webp";
-import copy_img from "../../assets/image/copy_img.webp";
-import arbitrum_img from "../../assets/image/arbitrum_img.webp";
-import apiService from "../../core/sevice/detail";
-import { postMethod, getMethod } from "../../core/sevice/common.api";
-import supptNetwrk_img from "../../assets/image/supptNetwrk_img.webp";
-import "./wallet.css";
-import { IoArrowDownCircleOutline } from "react-icons/io5";
-import { IoArrowUpCircleOutline } from "react-icons/io5";
-import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
-import { useTelegramUser } from "../../context/TelegramUserContext";
-import { useChain } from "../../context/ChainContext";
-import walletIMG from "../../assets/image/wllt_img.webp";
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
+import apiService from '../../core/sevice/detail';
+import { postMethod } from '../../core/sevice/common.api';
+import { useTelegramUser } from '../../context/TelegramUserContext';
+import { useChain } from '../../context/ChainContext';
+import BottomTab from '../BottomTab/BottomTab';
+import { C } from '../../theme';
+import {
+  CopyIcon, CheckIcon, SolLogo, ArbLogo, DisconnectIcon,
+  WarningIcon, ShieldIcon,
+} from '../../Components/Icons';
+
+// ─── Coin definitions ─────────────────────────────────────────────────────────
+const UsdcLogo = () => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="10" fill="#2775CA" />
+    <text x="12" y="13.5" textAnchor="middle" fill="white" fontSize="5.5" fontWeight="800" letterSpacing="0.2">USDC</text>
+  </svg>
+);
+
+const COINS = {
+  SOL:       { name: 'Solana',       network: 'Solana Mainnet', Logo: SolLogo,  color: '#9945FF', chain: 'SOL' },
+  'USDC-SOL':{ name: 'USDC (SPL)',   network: 'Solana SPL Token', Logo: UsdcLogo, color: '#2775CA', chain: 'SOL' },
+  'USDC-ARB':{ name: 'USDC (ERC-20)',network: 'Arbitrum One',   Logo: UsdcLogo, color: '#2775CA', chain: 'ARB' },
+  ARB:       { name: 'Arbitrum ETH', network: 'Arbitrum One',   Logo: ArbLogo,  color: '#28A0F0', chain: 'ARB' },
+};
+
+const CoinRow = ({ coinKey, selected, onSelect }) => {
+  const coin = COINS[coinKey];
+  const isSelected = selected === coinKey;
+  return (
+    <button
+      onClick={() => onSelect(isSelected ? null : coinKey)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '14px 16px',
+        background: isSelected ? `${C.purple}12` : C.surface,
+        border: `1.5px solid ${isSelected ? C.purple : C.border}`,
+        borderRadius: 14, cursor: 'pointer', width: '100%', textAlign: 'left',
+      }}
+    >
+      <div style={{ width: 40, height: 40, borderRadius: 12, background: `${coin.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <coin.Logo />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>{coin.name}</div>
+        <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{coin.network}</div>
+      </div>
+      {isSelected && (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M20 6L9 17l-5-5" stroke={C.purple} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
+    </button>
+  );
+};
+
+// ─── Main component ───────────────────────────────────────────────────────────
 const Wallet = () => {
   const navigate = useNavigate();
-  const [walletLogo, setWalletLogo] = useState(
-    new URL("./../assets/wallet_connect.webp", import.meta.url)
-  );
-  const [walletName, setWalletName] = useState(localStorage.getItem('walletName'));
-  // alert(`localStorage.getItem('walletAddress'):${localStorage.getItem('walletAddress')}`)
-  // alert(`localStorage.getItem('walletName'):${localStorage.getItem('walletName')}`)
-  const [walletAddress, setWalletAddress] = useState(localStorage.getItem('walletAddress'));
-  const [activeBets, setActiveBets] = useState([]);
   const { telegramUser } = useTelegramUser();
   const { activeChain, switchChain } = useChain();
+
+  const [walletName, setWalletName]       = useState(localStorage.getItem('walletName'));
+  const [walletAddress, setWalletAddress] = useState(localStorage.getItem('walletAddress'));
   const [custodialWallets, setCustodialWallets] = useState([]);
- const [userWallet, setUserWallet] = useState({
-  isConnected: false,
-  walletAddress: "",
-  walletName: "",
-  uniqueId: "",
-});
-  const [userProfile, setUserProfile] = useState(null);
-  const [loadingBets, setLoadingBets] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [LoadingBalance, setLoadingBalance] = useState(false);
-  const [UsdtBalance, setUsdtBalance] = useState(0);
+  const [userWallet, setUserWallet]       = useState({ isConnected: false, walletAddress: '', walletName: '', uniqueId: '' });
+  const [loadingBalance, setLoadingBalance] = useState(false);
+  const [usdtBalance, setUsdtBalance]     = useState(0);
+  const [copied, setCopied]               = useState('');
 
-  const getUserProfile = async () => {
-    try {
-      setLoadingProfile(true);
-
-      const telegramUserID = telegramUser.telegramId;
-      // const telegramUserID = Number("1453204703");
-
-      if (!telegramUserID) {
-        console.error("Telegram user not found");
-        setLoadingProfile(false);
-        return;
-      }
-
-      const data = {
-        apiUrl: apiService.getUserProfile,
-        payload: { telegramId: telegramUserID },
-      };
-
-      const resp = await postMethod(data);
-
-      setLoadingProfile(false);
-
-      if (resp.success) {
-        setUserProfile(resp.data);
-        console.log("User profile fetched:", resp.data);
-      } else {
-        console.error(resp.message || "Failed to fetch user profile");
-      }
-    } catch (error) {
-      setLoadingProfile(false);
-      console.error("Error fetching user profile:", error);
-    }
-  };
+  // Deposit / withdraw inline state
+  const [tab, setTab]                     = useState('deposit');
+  const [selectedCoin, setSelectedCoin]   = useState(null);
+  const [withdrawAmt, setWithdrawAmt]     = useState('');
+  const [withdrawAddr, setWithdrawAddr]   = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [showDisconnect, setShowDisconnect] = useState(false);
 
   useEffect(() => {
-    getUserProfile();
-    getActiveBets();
-    getUserDetails()
+    getUserDetails();
+    getBalance();
   }, []);
 
-  const showsuccessToast = (message) => {
-    toast.dismiss();
-    toast.success(message);
+  const copy = (text, key = 'main') => {
+    navigator.clipboard.writeText(text);
+    setCopied(key);
+    toast.success('Copied!');
+    setTimeout(() => setCopied(''), 2000);
   };
 
-  const copy = (text) => {
-    toast.success("Wallet ID copied");
-    navigator.clipboard.writeText(text);
+  const truncateAddress = (address) => {
+    if (!address) return '0x015f9711....8f78';
+    return `${address.slice(0, 8)}....${address.slice(-4)}`;
   };
 
   const getUserDetails = async () => {
     try {
       if (!telegramUser?.telegramId) return;
-  
-      const resp = await postMethod({
-        apiUrl: apiService.getUserDetails,
-        payload: { telegramId: telegramUser.telegramId },
-      });
-  
+      const resp = await postMethod({ apiUrl: apiService.getUserDetails, payload: { telegramId: telegramUser.telegramId } });
       if (resp.success && resp.data) {
         setUserWallet({
           isConnected: resp.data.wallet?.isConnected || false,
-          walletAddress: resp.data.wallet?.walletAddress || "",
-          walletName: resp.data.wallet?.walletName || "",
-          uniqueId: resp.data.uniqueId || "",
+          walletAddress: resp.data.wallet?.walletAddress || '',
+          walletName: resp.data.wallet?.walletName || '',
+          uniqueId: resp.data.uniqueId || '',
         });
         if (Array.isArray(resp.data.custodialWallets) && resp.data.custodialWallets.length > 0) {
           setCustodialWallets(resp.data.custodialWallets);
         }
-        if(resp.data.wallet?.isConnected == true){
-          setWalletAddress(resp.data.wallet?.walletAddress)
+        if (resp.data.wallet?.isConnected) {
+          setWalletAddress(resp.data.wallet.walletAddress);
         }
-      } else {
-        console.error(resp.message || "Failed to fetch user details");
       }
     } catch (error) {
-      console.error("Error fetching user details:", error);
-    }
-  };
-
- useEffect(() => {
-  if (userWallet?.isConnected && userWallet.walletName) {
-    // setWalletName(userWallet.walletName);
-    setWalletAddress(localStorage.getItem("walletAddress"));
-    let logoUrl;
-    switch (userWallet.walletName) {
-      case "metamask":
-        logoUrl = new URL("../../assets/image/metamask.png", import.meta.url);
-        break;
-      case "coinbase":
-        logoUrl = new URL("../../assets/image/coinbase.png", import.meta.url);
-        break;
-      case "trustwallet":
-        logoUrl = new URL("../../assets/image/trustwallet.png", import.meta.url);
-        break;
-      case "walletconnect":
-        logoUrl = new URL("../../assets/image/wallet_connect.webp", import.meta.url);
-        break;
-      case "Phantom":
-        logoUrl = new URL("../../assets/image/phantom.webp", import.meta.url);
-        break;
-      case "Solflare":
-        logoUrl = new URL("../../assets/image/solsfare.webp", import.meta.url);
-        break;
-      default:
-        logoUrl = null;
-    }
-    if (logoUrl) setWalletLogo(logoUrl);
-    return; 
-  }
-
-  const walletAddress = localStorage.getItem("walletAddress");
-
-  const connectedWallet = localStorage.getItem("walletName");
-
-  if (connectedWallet) {
-    setWalletName(connectedWallet);
-    setWalletAddress(walletAddress);
-    let logoUrl;
-    switch (connectedWallet) {
-      case "metamask":
-        logoUrl = new URL("../../assets/image/metamask.png", import.meta.url);
-        break;
-      case "coinbase":
-        logoUrl = new URL("../../assets/image/coinbase.png", import.meta.url);
-        break;
-      case "trustwallet":
-        logoUrl = new URL("../../assets/image/trustwallet.png", import.meta.url);
-        break;
-      case "walletconnect":
-        logoUrl = new URL("../../assets/image/wallet_connect.webp", import.meta.url);
-        break;
-      case "phantom":
-        logoUrl = new URL("../../assets/image/phantom.webp", import.meta.url);
-        break;
-      case "solflare":
-        logoUrl = new URL("../../assets/image/solsfare.webp", import.meta.url);
-        break;
-      default:
-        logoUrl = null;
-    }
-
-    if (logoUrl) setWalletLogo(logoUrl);
-  }
-
-    getBalance();
-
-}, [userWallet]);
-
-
-  const truncateAddress = (address) => {
-    if (!address) return "0x015f9711a....18f78";
-    return `${address.slice(0, 8)}....${address.slice(-4)}`;
-  };
-
-  const handleDisconnect = async () => {
-    try {
-      const name = (userWallet.walletName || localStorage.getItem("walletName") || "").toLowerCase();
-      if (name === "phantom" || name === "solflare") {
-        try {
-          await postMethod({
-            apiUrl: apiService.disconnect_wallet,
-            payload: { uniqueId: userWallet.uniqueId },
-          });
-        } catch (e) {
-          console.error("Disconnect API error:", e);
-        }
-      }
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith("@appkit/"))
-        .forEach((k) => localStorage.removeItem(k));
-      ["walletconnect","wc@2:client","wagmi.recentConnectorId","wagmi.connected",
-       "WALLETCONNECT_DEEPLINK_CHOICE","walletDetails"].forEach((k) => localStorage.removeItem(k));
-      localStorage.setItem("walletAddress", "");
-      localStorage.setItem("walletName", "");
-      setWalletAddress("");
-      setWalletName("");
-      setUserWallet({ isConnected: false, walletAddress: "", walletName: "", uniqueId: "" });
-      toast.success("Wallet disconnected");
-      navigate("/onBoarding");
-    } catch (err) {
-      console.error("Disconnect error:", err);
-      toast.error("Failed to disconnect");
+      console.error('Error fetching user details:', error);
     }
   };
 
   useEffect(() => {
-    getBalance();
-  }, [0]);
-
-  const getActiveBets = async () => {
-    try {
-      setLoadingBets(true);
-      const telegramUserID = telegramUser.telegramId;
-      // const telegramUserID = Number('1453204703');
-      if (!telegramUserID) {
-        console.error("Telegram user not found");
-        setLoadingBets(false);
-        return;
+    if (userWallet?.isConnected && userWallet.walletName) {
+      setWalletAddress(localStorage.getItem('walletAddress'));
+    } else {
+      const stored = localStorage.getItem('walletName');
+      if (stored) {
+        setWalletName(stored);
+        setWalletAddress(localStorage.getItem('walletAddress'));
       }
-
-      const data = {
-        apiUrl: apiService.activebets,
-        payload: { telegramId: telegramUserID },
-      };
-
-      const resp = await postMethod(data);
-
-      setLoadingBets(false);
-
-      if (resp.success) {
-        setActiveBets(resp.data);
-        console.log("Active bets fetched:", resp.data);
-      } else {
-        console.error(resp.message || "Failed to fetch active bets");
-      }
-    } catch (error) {
-      setLoadingBets(false);
-      console.error("Error fetching active bets:", error);
     }
-  };
+  }, [userWallet]);
 
   const getBalance = async () => {
     try {
-       const telegramUserID = telegramUser?.telegramId;
-      // const telegramUserID = Number("1453204703");
-      if (!telegramUserID) {
-        console.error("Telegram user not found");
-        setLoadingBalance(false);
-        return;
-      }
-      
-      const data = {
-        apiUrl: apiService.get_user_balance,
-        payload: { telegramId: telegramUserID },
-      };
-
-      const resp = await postMethod(data);
-
-      setLoadingBalance(false);
-
-      if (resp.success) {
-        setUsdtBalance(resp.totalUsdt)
-        console.log("Active bets fetched:", resp.data);
-      } else {
-        console.error(resp.message || "Failed to fetch active bets");
-      }
+      const telegramUserID = telegramUser?.telegramId;
+      if (!telegramUserID) return;
+      setLoadingBalance(true);
+      const resp = await postMethod({ apiUrl: apiService.get_user_balance, payload: { telegramId: telegramUserID } });
+      if (resp.success) setUsdtBalance(resp.totalUsdt);
     } catch (error) {
-      console.error("Error fetching Wallet balance:", error);
+      console.error('Error fetching balance:', error);
+    } finally {
+      setLoadingBalance(false);
     }
   };
 
+  const handleDisconnect = async () => {
+    try {
+      const name = (userWallet.walletName || localStorage.getItem('walletName') || '').toLowerCase();
+      if (name === 'phantom' || name === 'solflare') {
+        await postMethod({ apiUrl: apiService.disconnect_wallet, payload: { uniqueId: userWallet.uniqueId } }).catch(() => {});
+      }
+      Object.keys(localStorage).filter(k => k.startsWith('@appkit/')).forEach(k => localStorage.removeItem(k));
+      ['walletconnect', 'wc@2:client', 'wagmi.recentConnectorId', 'wagmi.connected', 'WALLETCONNECT_DEEPLINK_CHOICE', 'walletDetails']
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem('walletAddress', '');
+      localStorage.setItem('walletName', '');
+      setWalletAddress('');
+      setWalletName('');
+      setUserWallet({ isConnected: false, walletAddress: '', walletName: '', uniqueId: '' });
+      toast.success('Wallet disconnected');
+      navigate('/onBoarding');
+    } catch {
+      toast.error('Failed to disconnect');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmt || !withdrawAddr) return;
+    try {
+      setWithdrawLoading(true);
+      const coin = COINS[selectedCoin];
+      const resp = await postMethod({
+        apiUrl: apiService.withdraw,
+        payload: {
+          telegramId: telegramUser?.telegramId,
+          amount: Number(withdrawAmt),
+          toAddress: withdrawAddr,
+          network: coin?.chain || 'SOL',
+          currency: selectedCoin,
+        },
+      });
+      if (resp.success || resp.status) {
+        toast.success('Withdrawal submitted!');
+        setWithdrawAmt('');
+        setWithdrawAddr('');
+      } else {
+        toast.error(resp.message || 'Withdrawal failed');
+      }
+    } catch {
+      toast.error('Something went wrong');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  // Resolve deposit address for selected coin based on custodial wallets
+  const getDepositAddress = (coinKey) => {
+    const coin = COINS[coinKey];
+    if (!coin) return null;
+    const cw = custodialWallets.find(w => w.network === coin.chain);
+    return cw?.address || walletAddress || null;
+  };
+
+  const activeWalletAddress = custodialWallets.find(w => w.network === activeChain)?.address || walletAddress;
+  const displayName = walletName === 'newwallet' ? 'Own Wallet' : walletName ? walletName.charAt(0).toUpperCase() + walletName.slice(1) : 'Wallet';
+  const coin = selectedCoin ? COINS[selectedCoin] : null;
+  const depositAddress = selectedCoin ? getDepositAddress(selectedCoin) : null;
+  const coinLabel = selectedCoin === 'USDC-SOL' || selectedCoin === 'USDC-ARB' ? 'USDC' : selectedCoin;
+
   return (
-    <div
-      className="cmmn_bdy_mainwrp wllt_bdy_mainwrp"
-      style={pageStyle.wllt_bdy_mainwrp}
-    >
-      <div className="wllt_bdy_cntWrp" style={pageStyle.wllt_bdy_cntWrp}>
-        <div className="wllt_top_cntWrp" style={pageStyle.wllt_top_cntWrp}>
-          <div className="wllt_top_cnt" style={pageStyle.wllt_top_cnt}>
-            <h5 style={pageStyle.wllt_top_cntHead}>Wallet</h5>
-            <p style={pageStyle.wllt_top_cntPara}>
-              Manage your funds and transactions
-            </p>
+    <div style={{ minHeight: '100vh', background: C.bg, paddingBottom: 100 }}>
+
+      {/* HEADER HERO */}
+      <div style={{ background: `linear-gradient(180deg, #0d0e1f, ${C.bg})`, padding: '24px 20px 20px', position: 'relative', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: -60, left: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(14,165,233,0.2) 0%, transparent 70%)', pointerEvents: 'none' }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h5 style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.5, marginBottom: 4 }}>Wallet</h5>
+          <p style={{ fontSize: 12, color: C.muted, marginBottom: 16 }}>Manage your funds and transactions</p>
+
+          {/* Balance card */}
+          <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 18 }}>
+            <div style={{ color: C.muted, fontSize: 12, marginBottom: 6, fontWeight: 500 }}>Available Balance</div>
+            {loadingBalance ? (
+              <div className="skl skl-number-lg" style={{ marginBottom: 4 }} />
+            ) : (
+              <div style={{ fontWeight: 800, fontSize: 34, letterSpacing: -1 }}>${usdtBalance ? usdtBalance.toFixed(6) : '0.000000'}</div>
+            )}
+            <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>USDC</div>
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
+                <span style={{ fontSize: 13, color: C.sub }}>Solana + Arbitrum Active</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <SolLogo />
+                <ArbLogo />
+              </div>
+            </div>
           </div>
-          <ImageComponent
-            styles={pageStyle.wllt_top_img}
-            imgPic={wllt_top_img}
-            alt="wllt_top_img"
-          />
+
+          {/* Disconnect button */}
+          <button
+            onClick={() => setShowDisconnect(true)}
+            style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 12, border: `1px solid ${C.red}40`, background: `${C.red}10`, color: C.red, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <DisconnectIcon /> Disconnect / Switch Wallet
+          </button>
+        </div>
+      </div>
+
+      {/* Deposit / Withdraw tabs */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+        {['deposit', 'withdraw'].map(t => (
+          <button
+            key={t}
+            onClick={() => { setTab(t); setSelectedCoin(null); }}
+            style={{ padding: 14, background: 'transparent', border: 'none', borderBottom: tab === t ? `2px solid ${C.purple}` : '2px solid transparent', color: tab === t ? C.purpleL : C.muted, fontWeight: 600, fontSize: 14, cursor: 'pointer', textTransform: 'capitalize' }}
+          >
+            {t === 'deposit' ? '↓ Deposit' : '↑ Withdraw'}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* Coin selector */}
+        <div>
+          <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 10 }}>SELECT ASSET & NETWORK</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {Object.keys(COINS).map(k => (
+              <CoinRow key={k} coinKey={k} selected={selectedCoin} onSelect={setSelectedCoin} />
+            ))}
+          </div>
         </div>
 
-        <div className="wllt_balnc_cntWrp" style={pageStyle.wllt_balnc_cntWrp}>
-          <h6 className="wllt_balnc_cntTp" style={pageStyle.wllt_balnc_cntTp}>
-            <ImageComponent
-              styles={pageStyle.wllt_img}
-              imgPic={wllt_img}
-              alt="wllt_img"
-            />
-            Available Balance
-          </h6>
-            {LoadingBalance ? (
-    <div className="skl skl-number-md" />
-  ) : (
-    <h3 className="wllt_balnc_amt" style={pageStyle.wllt_balnc_amt}>
-      $ {UsdtBalance?UsdtBalance.toFixed(6):0}
-    </h3>
-  )}
-          <div
-            className="wllt_balnc_BtnWrp"
-            style={pageStyle.wllt_balnc_BtnWrp}
-          >
-            <button
-              className="wllt_balnc_Btn wllt_balnc_BtnDep"
-              style={pageStyle.wllt_balnc_Btn}
-              onClick={() => navigate("/deposit?tab=deposit")}
-            >
-              <span>
-                <IoArrowDownCircleOutline style={pageStyle.wllt_balnc_BtnArw} />
-              </span>
-              Deposit
-            </button>
-            <button
-              className="wllt_balnc_Btn wllt_balnc_BtnWdr"
-              style={pageStyle.wllt_balnc_Btn}
-              onClick={() => navigate("/deposit?tab=withdraw")}
-            >
-              <span>
-                <IoArrowUpCircleOutline style={pageStyle.wllt_balnc_BtnArw} />
-              </span>
-              Withdraw
-            </button>
-          </div>
+        {/* ── DEPOSIT PANEL ── */}
+        {tab === 'deposit' && selectedCoin && coin && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ background: `${C.green}0e`, border: `1px solid ${C.green}20`, borderRadius: 12, padding: '12px 16px', fontSize: 13, color: C.green, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ShieldIcon /> Balance credited automatically within 5–10 minutes
+            </div>
 
-          <div
-            className="wllt_balnc_cnntWlltWrp"
-            style={pageStyle.wllt_balnc_cnntWlltWrp}
-          >
-            <h6 style={pageStyle.wllt_balnc_cnntHead}>Connected Wallet</h6>
-            <span
-              style={pageStyle.wllt_balnc_cnntBadge}
-              className="wllt_balnc_cnntBadge"
-            >
-              {walletName =="newwallet" ?(<ImageComponent
-                  styles={pageStyle.wllt_balnc_img}
-                  imgPic={ new URL("../../assets/image/wllt_img.webp", import.meta.url)}
-                  alt="wallet_logo"
-                />):(
-                <ImageComponent
-                  styles={pageStyle.wllt_balnc_img}
-                  imgPic={walletLogo}
-                  alt="wallet_logo"
-                />
-              )
-              }
-              {walletName 
-                ?walletName =="newwallet"?"Own Wallet": walletName.charAt(0).toUpperCase() + walletName.slice(1)
-                : "MetaMask"}
-            </span>
-
-            {walletName === "newwallet" && custodialWallets.length > 0 ? (
-              <>
-                <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 8 }}>
-                  {["ARB", "SOL"].map(c => (
-                    <button
-                      key={c}
-                      onClick={() => {
-                        switchChain(c);
-                        const w = custodialWallets.find(x => x.network === c);
-                        if (w) { setWalletAddress(w.address); localStorage.setItem("walletAddress", w.address); }
-                      }}
-                      style={{
-                        flex: 1, padding: "6px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                        background: activeChain === c ? "#6366f1" : "rgba(255,255,255,0.08)",
-                        color: "#fff", fontWeight: activeChain === c ? 700 : 400, fontSize: 12,
-                      }}
-                    >
-                      {c === "ARB" ? "Arbitrum" : "Solana"}
-                    </button>
-                  ))}
-                </div>
-                <div className="wallet_id_Wrp" style={pageStyle.wallet_id_Wrp}>
-                  <div className="wallet_id" style={pageStyle.wallet_id}>
-                    <span>{truncateAddress(custodialWallets.find(w => w.network === activeChain)?.address || walletAddress)}</span>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 12, letterSpacing: 1 }}>DEPOSIT ADDRESS</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: `${coin.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <coin.Logo />
                   </div>
-                  <span
-                    className="wallet_id_Icon"
-                    style={pageStyle.wallet_id_Icon}
-                    onClick={() => copy(custodialWallets.find(w => w.network === activeChain)?.address || walletAddress)}
-                  >
-                    <ImageComponent styles={pageStyle.copy_img} imgPic={copy_img} alt="copy_img" />
-                  </span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{coin.name}</div>
+                    <div style={{ color: C.muted, fontSize: 11 }}>{coin.network}</div>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="wallet_id_Wrp" style={pageStyle.wallet_id_Wrp}>
-                <div className="wallet_id" style={pageStyle.wallet_id}>
-                  <span>{truncateAddress(walletAddress)}</span>
-                </div>
-                <span
-                  className="wallet_id_Icon"
-                  style={pageStyle.wallet_id_Icon}
-                  onClick={() => copy(walletAddress)}
+                <button
+                  onClick={() => depositAddress && copy(depositAddress, selectedCoin)}
+                  disabled={!depositAddress}
+                  style={{ background: copied === selectedCoin ? `${C.green}15` : C.purpleGlow, color: copied === selectedCoin ? C.green : C.purpleL, border: `1px solid ${copied === selectedCoin ? C.green + '30' : C.purpleGlow2}`, borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: depositAddress ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 5, opacity: depositAddress ? 1 : 0.4 }}
                 >
-                  <ImageComponent
-                    styles={pageStyle.copy_img}
-                    imgPic={copy_img}
-                    alt="copy_img"
-                  />
+                  {copied === selectedCoin ? <><CheckIcon /> Copied</> : <><CopyIcon /> Copy</>}
+                </button>
+              </div>
+              <div style={{ background: C.surface, borderRadius: 10, padding: '10px 14px', fontSize: 12, color: C.sub, wordBreak: 'break-all', border: `1px solid ${C.border}`, fontFamily: 'monospace', lineHeight: 1.6 }}>
+                {depositAddress || 'No wallet address found. Please reconnect.'}
+              </div>
+            </div>
+
+            <div style={{ background: `${C.red}08`, border: `1px solid ${C.red}20`, borderRadius: 12, padding: '12px 16px', fontSize: 12, color: C.red, display: 'flex', gap: 8 }}>
+              <WarningIcon />
+              <span>Only send <strong>{coin.name}</strong> to this address. Wrong assets = permanent loss.</span>
+            </div>
+
+            {(selectedCoin === 'USDC-ARB' || selectedCoin === 'USDC-SOL') && (
+              <div style={{ background: '#f59e0b08', border: '1px solid #f59e0b30', borderRadius: 12, padding: '12px 16px', fontSize: 12, color: '#f59e0b', display: 'flex', gap: 8, lineHeight: 1.6 }}>
+                <WarningIcon />
+                <span>
+                  You also need a small amount of <strong>{selectedCoin === 'USDC-ARB' ? 'ETH' : 'SOL'}</strong> in this wallet to pay network (gas) fees.{' '}
+                  USDC and {selectedCoin === 'USDC-ARB' ? 'ETH' : 'SOL'} are separate tokens — depositing USDC alone is not enough to send transactions.
                 </span>
               </div>
             )}
           </div>
+        )}
 
-          <button
-            onClick={handleDisconnect}
-            style={{
-              marginTop: "14px",
-              width: "100%",
-              padding: "10px",
-              borderRadius: "10px",
-              border: "1px solid rgba(239,68,68,0.4)",
-              background: "rgba(239,68,68,0.08)",
-              color: "#ef4444",
-              fontSize: "13px",
-              fontWeight: "600",
-              cursor: "pointer",
-              letterSpacing: "0.3px",
-            }}
-          >
-            Disconnect / Switch Wallet
-          </button>
+        {/* ── WITHDRAW PANEL ── */}
+        {tab === 'withdraw' && selectedCoin && coin && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px' }}>
+              <span style={{ color: C.muted, fontSize: 13 }}>Available</span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>{usdtBalance ? usdtBalance.toFixed(2) : '0.00'} {coinLabel}</span>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 10, letterSpacing: 1 }}>AMOUNT</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: C.surface, border: `1.5px solid ${withdrawAmt ? C.purple : C.border}`, borderRadius: 12, padding: '12px 16px' }}>
+                <span style={{ color: C.muted, fontWeight: 600, fontSize: 16 }}>$</span>
+                <input
+                  type="text" inputMode="decimal"
+                  value={withdrawAmt}
+                  onChange={e => setWithdrawAmt(e.target.value)}
+                  placeholder="0.00"
+                  style={{ flex: 1, background: 'transparent', border: 'none', color: C.text, fontSize: 20, fontWeight: 700, outline: 'none', fontFamily: 'inherit' }}
+                />
+                <span style={{ color: C.muted, fontSize: 13, fontWeight: 600 }}>{coinLabel}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                {['25', '50', '100', 'MAX'].map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setWithdrawAmt(v === 'MAX' ? String(usdtBalance?.toFixed(2) || '0') : v)}
+                    style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 0', color: C.sub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {v === 'MAX' ? 'Max' : `$${v}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 10, letterSpacing: 1 }}>WITHDRAW TO</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={withdrawAddr}
+                  onChange={e => setWithdrawAddr(e.target.value)}
+                  placeholder="Paste wallet address..."
+                  style={{ flex: 1, background: C.surface, border: `1.5px solid ${withdrawAddr ? C.purple : C.border}`, borderRadius: 10, padding: '11px 14px', color: C.text, fontSize: 14, outline: 'none', fontFamily: 'inherit' }}
+                />
+                <button
+                  onClick={() => navigator.clipboard.readText().then(t => setWithdrawAddr(t))}
+                  style={{ background: C.purpleGlow, color: C.purpleL, border: `1px solid ${C.purpleGlow2}`, borderRadius: 10, padding: '11px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Paste
+                </button>
+              </div>
+            </div>
+
+            <div style={{ background: `${C.red}08`, border: `1px solid ${C.red}20`, borderRadius: 12, padding: '12px 16px', fontSize: 12, color: C.red, display: 'flex', gap: 8 }}>
+              <WarningIcon />
+              <span>Make sure the address supports {coin.network}.</span>
+            </div>
+
+            <button
+              onClick={handleWithdraw}
+              disabled={!withdrawAmt || !withdrawAddr || withdrawLoading}
+              style={{ width: '100%', background: (!withdrawAmt || !withdrawAddr) ? C.card : `linear-gradient(135deg, ${C.purple}, #4f46e5)`, color: (!withdrawAmt || !withdrawAddr) ? C.muted : '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: (!withdrawAmt || !withdrawAddr || withdrawLoading) ? 'not-allowed' : 'pointer', opacity: (!withdrawAmt || !withdrawAddr || withdrawLoading) ? 0.5 : 1 }}
+            >
+              {withdrawLoading ? 'Submitting...' : `Withdraw ${coinLabel || ''}`}
+            </button>
+          </div>
+        )}
+
+        {!selectedCoin && (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: C.muted, fontSize: 14 }}>
+            Select an asset above to {tab}
+          </div>
+        )}
+
+        {/* Connected wallet */}
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 12 }}>CONNECTED WALLET</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C.purple}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 16 }}>👛</span>
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{displayName}</div>
+              <div style={{ fontSize: 12, color: C.muted }}>Custodial Wallet</div>
+            </div>
+          </div>
+
+          {/* Chain tabs for custodial */}
+          {walletName === 'newwallet' && custodialWallets.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              {['ARB', 'SOL'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => {
+                    switchChain(c);
+                    const w = custodialWallets.find(x => x.network === c);
+                    if (w) { setWalletAddress(w.address); localStorage.setItem('walletAddress', w.address); }
+                  }}
+                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', background: activeChain === c ? C.purple : C.surface, color: activeChain === c ? '#fff' : C.muted, fontWeight: activeChain === c ? 700 : 400, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+                >
+                  {c === 'ARB' ? <><ArbLogo /> Arbitrum</> : <><SolLogo /> Solana</>}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}` }}>
+            <span style={{ fontSize: 12, color: C.sub, fontFamily: 'monospace' }}>{truncateAddress(activeWalletAddress)}</span>
+            <button
+              onClick={() => copy(activeWalletAddress, 'addr')}
+              style={{ background: copied === 'addr' ? `${C.green}15` : C.purpleGlow, color: copied === 'addr' ? C.green : C.purpleL, border: `1px solid ${copied === 'addr' ? C.green + '30' : C.purpleGlow2}`, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              {copied === 'addr' ? <><CheckIcon /> Copied</> : <><CopyIcon /> Copy</>}
+            </button>
+          </div>
         </div>
 
-        <div className="wllt_winPec_Wrp" style={pageStyle.wllt_winPec_Wrp}>
-          <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
-            <h6 style={pageStyle.wllt_win_ItmHead}>
-              <span style={pageStyle.wllt_win_ItmEmoji}>🗳️</span>
-              <span>Total Bets</span>
-            </h6>
-            {loadingProfile ? (
-              <div className="skl skl-number-sm" />
-            ) : (
-              <h4 style={pageStyle.wllt_win_ItmValue}>
-                {userProfile && userProfile.totalPredictions ? userProfile.totalPredictions : 0}
-              </h4>
-            )}
-          </div>
-          <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
-            <h6 style={pageStyle.wllt_win_ItmHead}>
-              <span style={pageStyle.wllt_win_ItmEmoji}>💎</span>
-              <span>Total Winnings</span>
-            </h6>
-            {loadingProfile ? (
-              <div className="skl skl-number-sm" />
-            ) : (
-              <h4 style={pageStyle.wllt_win_ItmValue}>
-                {userProfile && userProfile.totalWins ? userProfile.totalWins : 0}
-              </h4>
-            )}
-          </div>
-          <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
-            <h6 style={pageStyle.wllt_win_ItmHead}>
-              <span style={pageStyle.wllt_win_ItmEmoji}>📈</span>
-              <span>Win Rate</span>
-            </h6>
-            {loadingProfile ? (
-              <div className="skl skl-number-sm" />
-            ) : (
-              <h4 style={pageStyle.wllt_win_ItmValue}>
-                {userProfile && userProfile.winRate ? `${Number(userProfile.winRate).toFixed(2)}%` : "0%"}
-              </h4>
-            )}
-          </div>
-          <div className="wllt_winPec_Itm" style={pageStyle.wllt_winPec_Itm}>
-            <h6 style={pageStyle.wllt_win_ItmHead}>
-              <span style={pageStyle.wllt_win_ItmEmoji}>⏳</span>
-              <span>Active Bets</span>
-            </h6>
-            {loadingProfile ? (
-              <div className="skl skl-number-sm" />
-            ) : (
-              <h4 style={pageStyle.wllt_win_ItmValue}>
-                {activeBets && activeBets.length ? activeBets.length : "0"}
-              </h4>
-            )}
-          </div>
-        </div>
-
-        <div className="wllt_supp_wrp" style={pageStyle.wllt_supp_wrp}>
-          <h6 className="wllt_supp_top" style={pageStyle.wllt_supp_top}>
-            <ImageComponent
-              styles={pageStyle.wllt_supp_img}
-              imgPic={supptNetwrk_img}
-              alt="supptNetwrk_img"
-            />
-            <span style={pageStyle.wllt_supp_cnt}>Supported Networks</span>
-          </h6>
-          <div className="wllt_supp_row" style={pageStyle.wllt_supp_row}>
-            <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
-              <ImageComponent
-                styles={pageStyle.wllt_supp_colimg}
-                imgPic={arbitrum_img}
-                alt="arbitrum_img"
-              />
-              <h6 style={pageStyle.wllt_supp_colCnt}>Arbitrum</h6>
-            </div>
-            <div className="wllt_supp_col" style={pageStyle.wllt_supp_col}>
-              <span style={{ fontSize: pageStyle.wllt_supp_colimg.width, lineHeight: 1 }}>◎</span>
-              <h6 style={pageStyle.wllt_supp_colCnt}>Solana</h6>
-            </div>
+        {/* Supported networks */}
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 14 }}>SUPPORTED NETWORKS</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {[
+              { Logo: ArbLogo, name: 'Arbitrum One', color: '#28A0F0' },
+              { Logo: SolLogo, name: 'Solana',       color: '#9945FF' },
+            ].map((n, i) => (
+              <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: C.surface, borderRadius: 12, padding: '12px 14px', border: `1px solid ${C.border}` }}>
+                <n.Logo />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{n.name}</div>
+                  <div style={{ fontSize: 11, color: n.color, marginTop: 2 }}>Active</div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      <BottomTab tabAct={3} />
+      {/* Disconnect confirm modal */}
+      {showDisconnect && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '0 20px' }}>
+          <div style={{ width: '100%', maxWidth: 380, background: C.surface, borderRadius: 20, padding: 24, border: `1px solid ${C.border}` }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 8 }}>Disconnect Wallet?</div>
+            <div style={{ color: C.muted, fontSize: 14, marginBottom: 20 }}>You will need to reconnect to trade or withdraw funds.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button onClick={handleDisconnect} style={{ width: '100%', background: 'linear-gradient(135deg, #dc2626, #b91c1c)', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                Disconnect
+              </button>
+              <button onClick={() => setShowDisconnect(false)} style={{ width: '100%', background: C.card, color: C.sub, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <BottomTab />
     </div>
   );
-};
-
-const pageStyle = {
-  wllt_bdy_mainwrp: {
-    padding: `${moderateScale(20)}px ${moderateScale(20)}px ${moderateScale(
-      110
-    )}px `,
-  },
-  wllt_top_cntWrp: {
-    padding: `${moderateScale(16)}px ${moderateScale(16)}px`,
-  },
-  wllt_top_img: {
-    width: `${moderateScale(41)}px`,
-    height: `${moderateScale(41)}px`,
-  },
-  wllt_top_cnt: {
-    gap: `${moderateScale(4)}px`,
-  },
-  wllt_top_cntHead: {
-    fontSize: `${moderateScale(18)}px`,
-  },
-  wllt_top_cntPara: {
-    fontSize: `${moderateScale(12)}px`,
-  },
-  wllt_balnc_cntWrp: {
-    padding: `${moderateScale(22)}px ${moderateScale(20)}px ${moderateScale(
-      24
-    )}px`,
-    margin: `${moderateScale(24)}px ${moderateScale(0)}px ${moderateScale(
-      32
-    )}px`,
-  },
-  wllt_balnc_cntTp: {
-    fontSize: `${moderateScale(15)}px`,
-    gap: `${moderateScale(5)}px`,
-    marginBottom: `${moderateScale(15)}px`,
-  },
-  wllt_img: {
-    width: `${moderateScale(28)}px`,
-    height: `${moderateScale(28)}px`,
-  },
-  wllt_balnc_amt: {
-    fontSize: `${moderateScale(32)}px`,
-  },
-  wllt_balnc_BtnWrp: {
-    marginTop: `${moderateScale(35)}px`,
-    gap: `${moderateScale(16)}px`,
-    paddingBottom: `${moderateScale(22)}px`,
-    marginBottom: `${moderateScale(24)}px`,
-  },
-  wllt_balnc_Btn: {
-    padding: `${moderateScale(10)}px ${moderateScale(10)}px `,
-    fontSize: `${moderateScale(14)}px`,
-    gap: `${moderateScale(7)}px`,
-  },
-  wllt_balnc_BtnArw: {
-    fontSize: `${moderateScale(17)}px`,
-  },
-  wllt_balnc_cnntWlltWrp: {
-    padding: `${moderateScale(12)}px ${moderateScale(12)}px ${moderateScale(
-      24
-    )}px`,
-  },
-  wllt_balnc_cnntHead: {
-    fontSize: `${moderateScale(15)}px`,
-    marginBottom: `${moderateScale(12)}px`,
-  },
-  wllt_balnc_cnntBadge: {
-    fontSize: `${moderateScale(12)}px`,
-    gap: `${moderateScale(5)}px`,
-    padding: `${moderateScale(3)}px ${moderateScale(6)}px`,
-  },
-  wllt_balnc_img: {
-    width: `${moderateScale(20)}px`,
-    height: `${moderateScale(20)}px`,
-  },
-  wallet_id_Wrp: {
-    marginTop: `${moderateScale(13)}px`,
-    gap: `${moderateScale(10)}px`,
-  },
-  wallet_id: {
-    padding: `${moderateScale(10)}px ${moderateScale(12)}px`,
-    fontSize: `${moderateScale(14)}px`,
-  },
-  wallet_id_Icon: {
-    padding: `${moderateScale(8)}px ${moderateScale(8)}px`,
-    width: `${moderateScale(40)}px`,
-    height: `${moderateScale(40)}px`,
-  },
-  copy_img: {
-    width: `${moderateScale(24)}px`,
-    height: `${moderateScale(24)}px`,
-  },
-  wllt_winPec_Wrp: {
-    gap: `${moderateScale(20)}px`,
-    margin: `${moderateScale(32)}px ${moderateScale(0)}px ${moderateScale(
-      32
-    )}px`,
-  },
-  wllt_winPec_Itm: {
-    gap: `${moderateScale(20)}px`,
-    padding: `${moderateScale(20)}px ${moderateScale(15)}px ${moderateScale(
-      28
-    )}px`,
-    // width: `calc(${moderateScale(50)}% - (${moderateScale(20)}px / 2) )`,
-    width: `calc(50% - (${moderateScale(20)}px / 2) )`,
-  },
-  wllt_win_ItmHead: {
-    fontSize: `${moderateScale(14)}px`,
-    gap: `${moderateScale(8)}px`,
-  },
-  wllt_win_ItmImg: {
-    width: `${moderateScale(17)}px`,
-    height: `${moderateScale(17)}px`,
-  },
-  wllt_win_ItmEmoji: {
-    fontSize: `${moderateScale(17)}px`,
-    lineHeight: 1,
-  },
-  wllt_win_ItmValue: {
-    fontSize: `${moderateScale(20)}px`,
-  },
-  wllt_sectNots_wrp: {
-    padding: `${moderateScale(16)}px ${moderateScale(16)}px`,
-    marginTop: `${moderateScale(16)}px`,
-    marginBottom: `${moderateScale(32)}px`,
-    gap: `${moderateScale(11)}px`,
-  },
-  wllt_sectNots_img: {
-    width: `${moderateScale(24)}px`,
-    height: `${moderateScale(24)}px`,
-  },
-  wllt_sectNots_cnt: {
-    fontSize: `${moderateScale(15)}px`,
-  },
-  wllt_sectNots_icon: {
-    fontSize: `${moderateScale(20)}px`,
-  },
-  wllt_supp_wrp: {
-    gap: `${moderateScale(20)}px`,
-    padding: `${moderateScale(16)}px ${moderateScale(16)}px ${moderateScale(
-      24
-    )}px`,
-  },
-  wllt_supp_top: {
-    fontSize: `${moderateScale(15)}px`,
-    gap: `${moderateScale(10)}px`,
-  },
-  wllt_supp_img: {
-    width: `${moderateScale(26)}px`,
-    height: `${moderateScale(26)}px`,
-  },
-  wllt_supp_row: {
-    gap: `${moderateScale(15)}px`,
-  },
-  wllt_supp_col: {
-    gap: `${moderateScale(10)}px`,
-    width: `calc(25% - (${moderateScale(15)}px / 4))`,
-  },
-  wllt_supp_colimg: {
-    width: `${moderateScale(35)}px`,
-    height: `${moderateScale(35)}px`,
-  },
-  wllt_supp_colCnt: {
-    fontSize: `${moderateScale(13)}px`,
-  },
 };
 
 export default Wallet;

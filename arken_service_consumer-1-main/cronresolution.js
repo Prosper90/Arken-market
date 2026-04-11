@@ -524,14 +524,6 @@ cron.schedule("*/15 * * * *", async () => {
 
         const { txHash } = await settleUMAAssertion(market.umaAssertionId);
 
-        await Market.findByIdAndUpdate(market._id, {
-          umaStatus: "accepted",
-          umaSettledTxHash: txHash,
-          marketStatus: "resolved",
-          active: false,
-          closed: true,
-        });
-
         // Settle all open predictions (same pattern as AI Pass 2)
         const verdict = market.umaVerdict;
         const winningIndex = (market.outcomes || []).findIndex(
@@ -542,6 +534,41 @@ cron.schedule("*/15 * * * *", async () => {
           console.warn(`  ⚠️ UMA verdict "${verdict}" not in outcomes for market ${market._id}`);
           continue;
         }
+
+        // ── On-chain resolution ──────────────────────────────────────────────
+        if (market.arkenMarketAddress) {
+          try {
+            const evmResult = await arkenEvm.resolveMarket({
+              adminPrivateKey: process.env.EVM_PRIVATE_KEY,
+              marketAddress: market.arkenMarketAddress,
+              winningOption: winningIndex,
+            });
+            console.log(`  ✅ EVM resolveMarket tx: ${evmResult?.txHash}`);
+          } catch (evmErr) {
+            console.error(`  ❌ EVM resolveMarket failed for ${market._id}:`, evmErr.message);
+          }
+        }
+
+        if (market.solanaMarketId && arkenSolana.isDeployed()) {
+          try {
+            await arkenSolana.resolveMarket({
+              adminPrivateKey: process.env.SOLFLARE_PRIVATE_KEY,
+              mongodbId: market._id.toString(),
+              winningOption: winningIndex,
+            });
+            console.log(`  ✅ Solana resolveMarket done for ${market._id}`);
+          } catch (solErr) {
+            console.error(`  ❌ Solana resolveMarket failed for ${market._id}:`, solErr.message);
+          }
+        }
+
+        await Market.findByIdAndUpdate(market._id, {
+          umaStatus: "accepted",
+          umaSettledTxHash: txHash,
+          marketStatus: "resolved",
+          active: false,
+          closed: true,
+        });
 
         const predictions = await Prediction.find({
           marketId: market._id.toString(),

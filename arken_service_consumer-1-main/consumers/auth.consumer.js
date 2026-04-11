@@ -1,5 +1,5 @@
 const { getChannel } = require('../rabbit');;
-const { getMergedMarketsHandler,verifyTelegramWebAppHandler,disconnectWalletHandler,getUserByTelegramIdHandler,getDappKeyHandler,getUniqueIdHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,getMergedMarketByIdHandler,userDepositListHandler,UniqueIdHandler,verify_UniqueIdHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId,getAddress,creat_new_wallet,send_otp,resend_otp,verify_otp,get_deposit_list,getReferralInfoHandler,createUserMarketHandler,submitUMAAssertionHandler,joinPrivateMarketHandler,confirmJoinPrivateMarketHandler,disputeMarketHandler,getUserMarketsHandler,closeMarketHandler,getUserWithdrawList,addMarketLiquidityHandler,sweepUserDepositsHandler,sellPositionHandler} = require('../services/auth.service');
+const { getMergedMarketsHandler,verifyTelegramWebAppHandler,disconnectWalletHandler,getUserByTelegramIdHandler,getDappKeyHandler,getUniqueIdHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,getMergedMarketByIdHandler,userDepositListHandler,UniqueIdHandler,verify_UniqueIdHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId,getAddress,creat_new_wallet,send_otp,resend_otp,verify_otp,get_deposit_list,getReferralInfoHandler,createUserMarketHandler,submitUMAAssertionHandler,joinPrivateMarketHandler,confirmJoinPrivateMarketHandler,disputeMarketHandler,getUserMarketsHandler,closeMarketHandler,getUserWithdrawList,addMarketLiquidityHandler,sweepUserDepositsHandler,sellPositionHandler,linkEmailHandler,verifyEmailOtpHandler,initiateAccountRecoveryHandler,confirmAccountRecoveryHandler} = require('../services/auth.service');
 // const { getMergedMarketsHandler,verifyTelegramWebAppHandler,getHomeTodayNewsHandler,getUserProfileHandler,getTelegramGroupListHandler,updateGroupCommissionHandler,getCompletedBetsForUserHandler,getActiveBetsForUserHandler,verifyWalletAppHandler,userbetplaceHandler,userDepositListHandler,getCurrenyListHandler,userWithdrawHandler,userBalanceHandler, getUserTotalWinningsHandler,usertelegramId, getMergedMarketByIdHandler} = require('../services/auth.service');
 const queuename = require("../queue/queuename");
 
@@ -565,6 +565,14 @@ channel.ack(msg);
         result = await addMarketLiquidityHandler(data);
       } else if (data.action === queuename.sellPosition) {
         result = await sellPositionHandler(data);
+      } else if (data.action === queuename.linkEmail) {
+        result = await linkEmailHandler(data);
+      } else if (data.action === queuename.verifyEmailOtp) {
+        result = await verifyEmailOtpHandler(data);
+      } else if (data.action === queuename.initiateAccountRecovery) {
+        result = await initiateAccountRecoveryHandler(data);
+      } else if (data.action === queuename.confirmAccountRecovery) {
+        result = await confirmAccountRecoveryHandler(data);
       }
 
       if (!data.action) {

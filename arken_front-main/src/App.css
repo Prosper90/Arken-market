@@ -13,16 +13,27 @@
 
 body{
     height: 100vh;
-    background: #000000;
+    background: #070710;
     touch-action: pan-y;
     overscroll-behavior: none;
+    font-family: 'Inter', 'Satoshi', sans-serif;
+    color: #f0f0f8;
 }
 
 .cmmn_bdy_mainwrp{
-    /* height: 100vh; */
-    background: #000000;
+    background: #070710;
     padding: 30px 20px 20px;
     overflow: auto;
+}
+
+/* Arken fade-up animation used by new screens */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 .error-text{

@@ -2,19 +2,28 @@
  * Arken Solana Service
  * Handles on-chain bet placement and market management on the Solana Anchor program.
  *
- * Requires after anchor build + deploy:
- *   ARKEN_PROGRAM_ID  — deployed program ID
- *   SOLANA_RPC_URL    — Solana RPC (devnet or mainnet)
- *   SOLANA_USDC_MINT  — USDC mint on Solana
+ * Fee structure (2% total, 4-way split — matches EVM):
+ *   REFERRAL  = 60 bps → treasury_fee_pool (backend distributes off-chain via event logs)
+ *   CREATOR   = 40 bps → creator_fee_pool
+ *   LP        = 20 bps → lp_fee_pool
+ *   TREASURY  = 80 bps → treasury_fee_pool
+ *
+ * Env vars required after anchor deploy:
+ *   ARKEN_PROGRAM_ID    — deployed program ID
+ *   SOLANA_RPC_URL      — Solana RPC endpoint
+ *   SOLANA_USDC_MINT    — USDC mint address
+ *   SOLANA_TREASURY     — Treasury wallet pubkey (for fee routing)
  */
 
-const { Connection, PublicKey, Keypair, SystemProgram, SYSVAR_RENT_PUBKEY, Transaction, LAMPORTS_PER_SOL } = require("@solana/web3.js");
+const {
+  Connection, PublicKey, Keypair, SystemProgram,
+  SYSVAR_RENT_PUBKEY, Transaction, LAMPORTS_PER_SOL,
+} = require("@solana/web3.js");
 const { TOKEN_PROGRAM_ID, getAssociatedTokenAddress } = require("@solana/spl-token");
 const anchor = require("@coral-xyz/anchor");
 const { BN } = anchor;
 
 // ─── Inline IDL ──────────────────────────────────────────────────────────────
-// Generated from the arken_markets Anchor program. Update after anchor build if needed.
 
 const IDL = {
   version: "0.1.0",
@@ -23,99 +32,125 @@ const IDL = {
     {
       name: "createMarket",
       accounts: [
-        { name: "authority", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
+        { name: "authority",     isMut: true,  isSigner: true  },
+        { name: "market",        isMut: true,  isSigner: false },
+        { name: "vault",         isMut: true,  isSigner: false },
+        { name: "usdcMint",      isMut: false, isSigner: false },
+        { name: "tokenProgram",  isMut: false, isSigner: false },
         { name: "systemProgram", isMut: false, isSigner: false },
-        { name: "rent", isMut: false, isSigner: false },
+        { name: "rent",          isMut: false, isSigner: false },
       ],
-      args: [{ name: "params", type: { defined: { name: "CreateMarketParams" } } }],
+      args: [{ name: "params", type: { defined: "CreateMarketParams" } }],
     },
     {
       name: "addLiquidity",
       accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
-        { name: "lpPosition", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "userUsdcAccount", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
+        { name: "user",            isMut: true,  isSigner: true  },
+        { name: "market",          isMut: true,  isSigner: false },
+        { name: "lpPosition",      isMut: true,  isSigner: false },
+        { name: "vault",           isMut: true,  isSigner: false },
+        { name: "userUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",        isMut: false, isSigner: false },
+        { name: "tokenProgram",    isMut: false, isSigner: false },
+        { name: "systemProgram",   isMut: false, isSigner: false },
       ],
-      args: [{ name: "params", type: { defined: { name: "AddLiquidityParams" } } }],
-    },
-    {
-      name: "sellOption",
-      accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
-        { name: "position", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "userUsdcAccount", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
-      ],
-      args: [{ name: "params", type: { defined: { name: "SellOptionParams" } } }],
-    },
-    {
-      name: "closeMarket",
-      accounts: [
-        { name: "authority", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
-      ],
-      args: [],
-    },
-    {
-      name: "claimLpPosition",
-      accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "market", isMut: false, isSigner: false },
-        { name: "lpPosition", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "userUsdcAccount", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
-      ],
-      args: [{ name: "params", type: { defined: { name: "ClaimLpPositionParams" } } }],
+      args: [{ name: "params", type: { defined: "AddLiquidityParams" } }],
     },
     {
       name: "placeBet",
       accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
-        { name: "position", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "userUsdcAccount", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
+        { name: "user",            isMut: true,  isSigner: true  },
+        { name: "market",          isMut: true,  isSigner: false },
+        { name: "position",        isMut: true,  isSigner: false },
+        { name: "vault",           isMut: true,  isSigner: false },
+        { name: "userUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",        isMut: false, isSigner: false },
+        { name: "tokenProgram",    isMut: false, isSigner: false },
+        { name: "systemProgram",   isMut: false, isSigner: false },
       ],
-      args: [{ name: "params", type: { defined: { name: "PlaceBetParams" } } }],
+      args: [{ name: "params", type: { defined: "PlaceBetParams" } }],
+    },
+    {
+      name: "sellOption",
+      accounts: [
+        { name: "user",            isMut: true,  isSigner: true  },
+        { name: "market",          isMut: true,  isSigner: false },
+        { name: "position",        isMut: true,  isSigner: false },
+        { name: "vault",           isMut: true,  isSigner: false },
+        { name: "userUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",        isMut: false, isSigner: false },
+        { name: "tokenProgram",    isMut: false, isSigner: false },
+        { name: "systemProgram",   isMut: false, isSigner: false },
+      ],
+      args: [{ name: "params", type: { defined: "SellOptionParams" } }],
+    },
+    {
+      name: "closeMarket",
+      accounts: [
+        { name: "authority", isMut: true,  isSigner: true  },
+        { name: "market",    isMut: true,  isSigner: false },
+      ],
+      args: [],
     },
     {
       name: "resolveMarket",
       accounts: [
-        { name: "authority", isMut: true, isSigner: true },
-        { name: "market", isMut: true, isSigner: false },
+        { name: "authority", isMut: true,  isSigner: true  },
+        { name: "market",    isMut: true,  isSigner: false },
       ],
       args: [{ name: "winningOption", type: "u8" }],
     },
     {
       name: "claimWinnings",
       accounts: [
-        { name: "user", isMut: true, isSigner: true },
-        { name: "market", isMut: false, isSigner: false },
-        { name: "position", isMut: true, isSigner: false },
-        { name: "vault", isMut: true, isSigner: false },
-        { name: "userUsdcAccount", isMut: true, isSigner: false },
-        { name: "usdcMint", isMut: false, isSigner: false },
-        { name: "tokenProgram", isMut: false, isSigner: false },
-        { name: "systemProgram", isMut: false, isSigner: false },
+        { name: "user",            isMut: true,  isSigner: true  },
+        { name: "market",          isMut: false, isSigner: false },
+        { name: "position",        isMut: true,  isSigner: false },
+        { name: "vault",           isMut: true,  isSigner: false },
+        { name: "userUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",        isMut: false, isSigner: false },
+        { name: "tokenProgram",    isMut: false, isSigner: false },
+        { name: "systemProgram",   isMut: false, isSigner: false },
+      ],
+      args: [],
+    },
+    {
+      name: "claimLpPosition",
+      accounts: [
+        { name: "user",            isMut: true,  isSigner: true  },
+        { name: "market",          isMut: false, isSigner: false },
+        { name: "lpPosition",      isMut: true,  isSigner: false },
+        { name: "vault",           isMut: true,  isSigner: false },
+        { name: "userUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",        isMut: false, isSigner: false },
+        { name: "tokenProgram",    isMut: false, isSigner: false },
+        { name: "systemProgram",   isMut: false, isSigner: false },
+      ],
+      args: [{ name: "params", type: { defined: "ClaimLpPositionParams" } }],
+    },
+    {
+      name: "claimCreatorFees",
+      accounts: [
+        { name: "creator",            isMut: true,  isSigner: true  },
+        { name: "market",             isMut: true,  isSigner: false },
+        { name: "vault",              isMut: true,  isSigner: false },
+        { name: "creatorUsdcAccount", isMut: true,  isSigner: false },
+        { name: "usdcMint",           isMut: false, isSigner: false },
+        { name: "tokenProgram",       isMut: false, isSigner: false },
+        { name: "systemProgram",      isMut: false, isSigner: false },
+      ],
+      args: [],
+    },
+    {
+      name: "claimTreasuryFees",
+      accounts: [
+        { name: "caller",                isMut: true,  isSigner: true  },
+        { name: "market",                isMut: true,  isSigner: false },
+        { name: "vault",                 isMut: true,  isSigner: false },
+        { name: "treasuryUsdcAccount",   isMut: true,  isSigner: false },
+        { name: "usdcMint",              isMut: false, isSigner: false },
+        { name: "tokenProgram",          isMut: false, isSigner: false },
+        { name: "systemProgram",         isMut: false, isSigner: false },
       ],
       args: [],
     },
@@ -126,18 +161,26 @@ const IDL = {
       type: {
         kind: "struct",
         fields: [
-          { name: "authority", type: "publicKey" },
-          { name: "marketId", type: { array: ["u8", 32] } },
-          { name: "pools", type: { array: ["u64", 10] } },
-          { name: "outcomeCount", type: "u8" },
-          { name: "platformFeePool", type: "u64" },
-          { name: "lpFeePool", type: "u64" },
-          { name: "totalLpShares", type: "u64" },
-          { name: "endTime", type: "i64" },
-          { name: "status", type: "u8" },
-          { name: "winningOption", type: "u8" },
-          { name: "bump", type: "u8" },
-          { name: "vaultBump", type: "u8" },
+          { name: "authority",              type: "publicKey" },
+          { name: "treasury",               type: "publicKey" },
+          { name: "creator",                type: "publicKey" },
+          { name: "marketId",               type: { array: ["u8", 32] } },
+          { name: "pools",                  type: { array: ["u64", 10] } },
+          { name: "lpPoolSeeds",            type: { array: ["u64", 10] } },
+          { name: "outcomeShares",          type: { array: ["u64", 10] } },
+          { name: "outcomeCount",           type: "u8"  },
+          { name: "creatorFeePool",         type: "u64" },
+          { name: "lpFeePool",              type: "u64" },
+          { name: "treasuryFeePool",        type: "u64" },
+          { name: "totalLpShares",          type: "u64" },
+          { name: "endTime",                type: "i64" },
+          { name: "status",                 type: "u8"  },
+          { name: "winningOption",          type: "u8"  },
+          { name: "resolvedTotalPool",      type: "u64" },
+          { name: "resolvedWinningSupply",  type: "u64" },
+          { name: "resolvedLpWinningSeeds", type: "u64" },
+          { name: "bump",                   type: "u8"  },
+          { name: "vaultBump",              type: "u8"  },
         ],
       },
     },
@@ -146,12 +189,12 @@ const IDL = {
       type: {
         kind: "struct",
         fields: [
-          { name: "user", type: "publicKey" },
-          { name: "market", type: "publicKey" },
-          { name: "option", type: "u8" },
-          { name: "shares", type: "u64" },
+          { name: "user",    type: "publicKey" },
+          { name: "market",  type: "publicKey" },
+          { name: "option",  type: "u8"   },
+          { name: "shares",  type: "u64"  },
           { name: "claimed", type: "bool" },
-          { name: "bump", type: "u8" },
+          { name: "bump",    type: "u8"   },
         ],
       },
     },
@@ -160,11 +203,11 @@ const IDL = {
       type: {
         kind: "struct",
         fields: [
-          { name: "user", type: "publicKey" },
-          { name: "market", type: "publicKey" },
-          { name: "lpShares", type: "u64" },
-          { name: "claimed", type: "bool" },
-          { name: "bump", type: "u8" },
+          { name: "user",     type: "publicKey" },
+          { name: "market",   type: "publicKey" },
+          { name: "lpShares", type: "u64"  },
+          { name: "claimed",  type: "bool" },
+          { name: "bump",     type: "u8"   },
         ],
       },
     },
@@ -175,9 +218,11 @@ const IDL = {
       type: {
         kind: "struct",
         fields: [
-          { name: "marketId", type: { array: ["u8", 32] } },
-          { name: "endTime", type: "i64" },
-          { name: "outcomeCount", type: "u8" },
+          { name: "marketId",     type: { array: ["u8", 32] } },
+          { name: "endTime",      type: "i64" },
+          { name: "outcomeCount", type: "u8"  },
+          { name: "treasury",     type: "publicKey" },
+          { name: "creator",      type: "publicKey" },
         ],
       },
     },
@@ -187,8 +232,9 @@ const IDL = {
         kind: "struct",
         fields: [
           { name: "marketId", type: { array: ["u8", 32] } },
-          { name: "option", type: "u8" },
-          { name: "amount", type: "u64" },
+          { name: "option",   type: "u8"  },
+          { name: "amount",   type: "u64" },
+          { name: "referrer", type: "publicKey" },
         ],
       },
     },
@@ -198,7 +244,7 @@ const IDL = {
         kind: "struct",
         fields: [
           { name: "marketId", type: { array: ["u8", 32] } },
-          { name: "amount", type: "u64" },
+          { name: "amount",   type: "u64" },
         ],
       },
     },
@@ -207,7 +253,9 @@ const IDL = {
       type: {
         kind: "struct",
         fields: [
-          { name: "marketId", type: { array: ["u8", 32] } },
+          { name: "marketId",       type: { array: ["u8", 32] } },
+          { name: "sellPercentage", type: "u8" },
+          { name: "referrer",       type: "publicKey" },
         ],
       },
     },
@@ -222,26 +270,31 @@ const IDL = {
     },
   ],
   errors: [
-    { code: 6000, name: "MarketNotOpen", msg: "Market is not open for betting" },
-    { code: 6001, name: "MarketAlreadyResolved", msg: "Market has already been resolved" },
-    { code: 6002, name: "MarketNotEnded", msg: "Market has not been resolved yet" },
-    { code: 6003, name: "InvalidOption", msg: "Invalid option index" },
-    { code: 6004, name: "BetTooLow", msg: "Amount is too low" },
-    { code: 6005, name: "NoWinnings", msg: "No winnings or shares to claim" },
-    { code: 6006, name: "AlreadyClaimed", msg: "Already claimed" },
-    { code: 6007, name: "Unauthorized", msg: "Only the market authority can perform this action" },
-    { code: 6008, name: "MarketExpired", msg: "Market has expired" },
-    { code: 6009, name: "InvalidOutcomeCount", msg: "Outcome count must be between 2 and 10" },
-    { code: 6010, name: "NoShares", msg: "Position has no shares" },
+    { code: 6000, name: "MarketNotOpen",         msg: "Market is not open for betting" },
+    { code: 6001, name: "MarketAlreadyResolved",  msg: "Market has already been resolved" },
+    { code: 6002, name: "MarketNotEnded",         msg: "Market has not been resolved yet" },
+    { code: 6003, name: "InvalidOption",          msg: "Invalid option index" },
+    { code: 6004, name: "BetTooLow",              msg: "Amount is too low" },
+    { code: 6005, name: "NoWinnings",             msg: "No winnings or shares to claim" },
+    { code: 6006, name: "AlreadyClaimed",         msg: "Already claimed" },
+    { code: 6007, name: "Unauthorized",           msg: "Only the market authority can perform this action" },
+    { code: 6008, name: "MarketExpired",          msg: "Market has expired" },
+    { code: 6009, name: "InvalidOutcomeCount",    msg: "Outcome count must be between 2 and 10" },
+    { code: 6010, name: "NoShares",               msg: "Position has no shares" },
+    { code: 6011, name: "InvalidSellPercentage",  msg: "Sell percentage must be between 1 and 100" },
+    { code: 6012, name: "NoFees",                 msg: "No fees to claim" },
+    { code: 6013, name: "NotCreator",             msg: "Not the creator of this market" },
+    { code: 6014, name: "NotTreasury",            msg: "Not the treasury of this market" },
   ],
 };
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const PROGRAM_ID_STR = process.env.ARKEN_PROGRAM_ID || "";
-const RPC_URL = process.env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
-const USDC_MINT_STR = process.env.SOLANA_USDC_MINT || "";
-const USDC_DECIMALS = 6;
+const PROGRAM_ID_STR = process.env.ARKEN_PROGRAM_ID  || "";
+const RPC_URL        = process.env.SOLANA_RPC_URL    || "https://api.devnet.solana.com";
+const USDC_MINT_STR  = process.env.SOLANA_USDC_MINT  || "";
+const TREASURY_STR   = process.env.SOLANA_TREASURY   || "";
+const USDC_DECIMALS  = 6;
 
 function isDeployed() {
   return (
@@ -257,11 +310,6 @@ function getConnection() {
   return new Connection(RPC_URL, "confirmed");
 }
 
-/**
- * Load a Keypair from either:
- *   - A JSON array string: "[1,2,3,...]"  (Solana standard format)
- *   - A base58 private key string
- */
 function loadKeypair(privateKeyValue) {
   if (!privateKeyValue) throw new Error("No private key provided");
   try {
@@ -280,57 +328,61 @@ function getProgram(keypair) {
   const wallet = new anchor.Wallet(keypair);
   const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
   const programId = new PublicKey(PROGRAM_ID_STR);
+  // Anchor 0.29 API: (IDL, programId, provider)
   return new anchor.Program(IDL, programId, provider);
 }
 
 function deriveMarketPDA(marketIdArray) {
-  const programId = new PublicKey(PROGRAM_ID_STR);
   return PublicKey.findProgramAddressSync(
     [Buffer.from("market"), Buffer.from(marketIdArray)],
-    programId
+    new PublicKey(PROGRAM_ID_STR)
   );
 }
 
 function deriveVaultPDA(marketPda) {
-  const programId = new PublicKey(PROGRAM_ID_STR);
   return PublicKey.findProgramAddressSync(
     [Buffer.from("vault"), marketPda.toBuffer()],
-    programId
+    new PublicKey(PROGRAM_ID_STR)
   );
 }
 
 function derivePositionPDA(marketPda, userPubkey) {
-  const programId = new PublicKey(PROGRAM_ID_STR);
   return PublicKey.findProgramAddressSync(
     [Buffer.from("position"), marketPda.toBuffer(), userPubkey.toBuffer()],
-    programId
+    new PublicKey(PROGRAM_ID_STR)
   );
 }
 
-/**
- * Convert a MongoDB _id string to a 32-byte array (for market_id PDA seed).
- * Zero-pads or truncates to exactly 32 bytes.
- */
+function deriveLpPositionPDA(marketPda, userPubkey) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("lp"), marketPda.toBuffer(), userPubkey.toBuffer()],
+    new PublicKey(PROGRAM_ID_STR)
+  );
+}
+
 function mongoIdToBytes32(mongodbId) {
   const bytes = Buffer.alloc(32, 0);
   const src = Buffer.from(mongodbId.slice(0, 32), "utf8");
   src.copy(bytes, 0, 0, Math.min(src.length, 32));
-  return Array.from(bytes);
+  return bytes;
+}
+
+const ZERO_PUBKEY = new PublicKey("11111111111111111111111111111111");
+
+function getTreasury() {
+  return TREASURY_STR ? new PublicKey(TREASURY_STR) : ZERO_PUBKEY;
 }
 
 // ─── Core: Place Bet ──────────────────────────────────────────────────────────
 
 /**
- * Place a bet on a Solana market using a custodial wallet.
- *
- * @param {object} params
- * @param {string} params.privateKey     - User's Solana private key (JSON array string or base58)
- * @param {string} params.mongodbId      - Market's MongoDB _id (used to derive PDA)
- * @param {number} params.optionIndex    - 0 = Yes, 1 = No
- * @param {number} params.amountUsdc     - Human-readable USDC amount (e.g. 10.5)
- * @returns {Promise<{ txHash: string, walletAddress: string }>}
+ * @param {string} params.privateKey    - User's Solana private key
+ * @param {string} params.mongodbId     - Market MongoDB _id
+ * @param {number} params.optionIndex   - Outcome index (0=Yes, 1=No, ...)
+ * @param {number} params.amountUsdc    - Human-readable USDC amount
+ * @param {string} [params.referrer]    - Referrer Solana pubkey (base58), optional
  */
-async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc }) {
+async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referrer }) {
   if (!isDeployed()) {
     console.warn("[ArkenSolana] Program not deployed — skipping on-chain bet");
     return null;
@@ -339,18 +391,19 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc }) {
   const keypair = loadKeypair(privateKey);
   const program = getProgram(keypair);
 
-  const marketIdArray = mongoIdToBytes32(mongodbId);
+  const marketIdArray  = mongoIdToBytes32(mongodbId);
   const amountLamports = new BN(Math.round(amountUsdc * 10 ** USDC_DECIMALS));
+  const referrerPubkey = referrer ? new PublicKey(referrer) : ZERO_PUBKEY;
 
-  const [marketPda] = deriveMarketPDA(marketIdArray);
-  const [vaultPda] = deriveVaultPDA(marketPda);
+  const [marketPda]   = deriveMarketPDA(marketIdArray);
+  const [vaultPda]    = deriveVaultPDA(marketPda);
   const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey);
 
-  const usdcMint = new PublicKey(USDC_MINT_STR);
+  const usdcMint    = new PublicKey(USDC_MINT_STR);
   const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
 
   const txHash = await program.methods
-    .placeBet({ marketId: marketIdArray, option: optionIndex, amount: amountLamports })
+    .placeBet({ marketId: marketIdArray, option: optionIndex, amount: amountLamports, referrer: referrerPubkey })
     .accounts({
       user: keypair.publicKey,
       market: marketPda,
@@ -367,18 +420,108 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc }) {
   return { txHash, walletAddress: keypair.publicKey.toBase58() };
 }
 
+// ─── User: Sell Position ──────────────────────────────────────────────────────
+
+/**
+ * @param {string} params.privateKey       - User's Solana private key
+ * @param {string} params.mongodbId        - Market MongoDB _id
+ * @param {number} [params.sellPercentage] - 1-100, default 100 (full sell)
+ * @param {string} [params.referrer]       - Referrer pubkey (base58)
+ */
+async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer }) {
+  if (!isDeployed()) {
+    console.warn("[ArkenSolana] Program not deployed — skipping sell");
+    return null;
+  }
+
+  const keypair = loadKeypair(privateKey);
+  const program = getProgram(keypair);
+
+  const marketIdArray  = mongoIdToBytes32(mongodbId);
+  const pct = sellPercentage && Number(sellPercentage) > 0
+    ? Math.min(100, Math.max(1, Math.round(Number(sellPercentage))))
+    : 100;
+  const referrerPubkey = referrer ? new PublicKey(referrer) : ZERO_PUBKEY;
+
+  const [marketPda]   = deriveMarketPDA(marketIdArray);
+  const [vaultPda]    = deriveVaultPDA(marketPda);
+  const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey);
+
+  const usdcMint    = new PublicKey(USDC_MINT_STR);
+  const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
+
+  const txHash = await program.methods
+    .sellOption({ marketId: marketIdArray, sellPercentage: pct, referrer: referrerPubkey })
+    .accounts({
+      user: keypair.publicKey,
+      market: marketPda,
+      position: positionPda,
+      vault: vaultPda,
+      userUsdcAccount: userUsdcAta,
+      usdcMint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+
+  console.log(`[ArkenSolana] Position sold (${pct}%). TxHash:`, txHash);
+  return { txHash, walletAddress: keypair.publicKey.toBase58() };
+}
+
+// ─── User: Add Liquidity ──────────────────────────────────────────────────────
+
+/**
+ * @param {string} params.privateKey   - LP's Solana private key
+ * @param {string} params.mongodbId    - Market MongoDB _id
+ * @param {number} params.amountUsdc   - Human-readable USDC amount
+ */
+async function addLiquidity({ privateKey, mongodbId, amountUsdc }) {
+  if (!isDeployed()) {
+    console.warn("[ArkenSolana] Program not deployed — skipping addLiquidity");
+    return null;
+  }
+
+  const keypair = loadKeypair(privateKey);
+  const program = getProgram(keypair);
+
+  const marketIdArray  = mongoIdToBytes32(mongodbId);
+  const amountLamports = new BN(Math.round(amountUsdc * 10 ** USDC_DECIMALS));
+
+  const [marketPda]    = deriveMarketPDA(marketIdArray);
+  const [vaultPda]     = deriveVaultPDA(marketPda);
+  const [lpPositionPda] = deriveLpPositionPDA(marketPda, keypair.publicKey);
+
+  const usdcMint    = new PublicKey(USDC_MINT_STR);
+  const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
+
+  const txHash = await program.methods
+    .addLiquidity({ marketId: marketIdArray, amount: amountLamports })
+    .accounts({
+      user: keypair.publicKey,
+      market: marketPda,
+      lpPosition: lpPositionPda,
+      vault: vaultPda,
+      userUsdcAccount: userUsdcAta,
+      usdcMint,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+    })
+    .rpc();
+
+  console.log(`[ArkenSolana] Liquidity added. TxHash:`, txHash);
+  return { txHash, walletAddress: keypair.publicKey.toBase58() };
+}
+
 // ─── Admin: Create Market ─────────────────────────────────────────────────────
 
 /**
- * Deploy a new market on Solana. Called when admin activates a market.
- *
- * @param {object} params
- * @param {string} params.adminPrivateKey  - Admin Solana keypair (JSON array or base58)
- * @param {string} params.mongodbId        - MongoDB _id to use as market_id seed
- * @param {number} params.endTimestamp     - Unix timestamp (seconds)
- * @returns {Promise<{ txHash: string, marketPda: string }>}
+ * @param {string} params.adminPrivateKey   - Admin Solana keypair
+ * @param {string} params.mongodbId         - MongoDB _id as PDA seed
+ * @param {number} params.endTimestamp      - Unix timestamp (seconds)
+ * @param {number} [params.outcomeCount]    - Default 2
+ * @param {string} [params.creatorAddress]  - Creator Solana pubkey (base58)
  */
-async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeCount = 2 }) {
+async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeCount = 2, creatorAddress }) {
   if (!isDeployed()) {
     console.warn("[ArkenSolana] Program not deployed — skipping market creation");
     return null;
@@ -387,19 +530,21 @@ async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeC
   const keypair = loadKeypair(adminPrivateKey);
   const program = getProgram(keypair);
 
-  const marketIdArray = mongoIdToBytes32(mongodbId);
-  const [marketPda] = deriveMarketPDA(marketIdArray);
-  const [vaultPda] = deriveVaultPDA(marketPda);
-  const usdcMint = new PublicKey(USDC_MINT_STR);
-
-  // outcomeCount must be 2-10 (Anchor program enforces this)
+  const marketIdArray    = mongoIdToBytes32(mongodbId);
+  const [marketPda]      = deriveMarketPDA(marketIdArray);
+  const [vaultPda]       = deriveVaultPDA(marketPda);
+  const usdcMint         = new PublicKey(USDC_MINT_STR);
   const safeOutcomeCount = Math.max(2, Math.min(10, outcomeCount));
+  const treasury         = getTreasury();
+  const creator          = creatorAddress ? new PublicKey(creatorAddress) : ZERO_PUBKEY;
 
   const txHash = await program.methods
     .createMarket({
       marketId: marketIdArray,
       endTime: new BN(endTimestamp.toString()),
       outcomeCount: safeOutcomeCount,
+      treasury,
+      creator,
     })
     .accounts({
       authority: keypair.publicKey,
@@ -419,27 +564,16 @@ async function createMarket({ adminPrivateKey, mongodbId, endTimestamp, outcomeC
 
 // ─── Admin: Resolve Market ────────────────────────────────────────────────────
 
-/**
- * Resolve a Solana market with the winning option.
- */
 async function resolveMarket({ adminPrivateKey, mongodbId, winningOption }) {
-  if (!isDeployed()) {
-    console.warn("[ArkenSolana] Program not deployed — skipping resolve");
-    return null;
-  }
+  if (!isDeployed()) { console.warn("[ArkenSolana] Not deployed"); return null; }
 
   const keypair = loadKeypair(adminPrivateKey);
   const program = getProgram(keypair);
 
-  const marketIdArray = mongoIdToBytes32(mongodbId);
-  const [marketPda] = deriveMarketPDA(marketIdArray);
-
+  const [marketPda] = deriveMarketPDA(mongoIdToBytes32(mongodbId));
   const txHash = await program.methods
     .resolveMarket(winningOption)
-    .accounts({
-      authority: keypair.publicKey,
-      market: marketPda,
-    })
+    .accounts({ authority: keypair.publicKey, market: marketPda })
     .rpc();
 
   console.log("[ArkenSolana] Market resolved. TxHash:", txHash);
@@ -448,31 +582,18 @@ async function resolveMarket({ adminPrivateKey, mongodbId, winningOption }) {
 
 // ─── User: Claim Winnings ─────────────────────────────────────────────────────
 
-/**
- * Claim winnings for a user after a Solana market resolves.
- * Must be called with the USER's custodial private key.
- *
- * @param {object} params
- * @param {string} params.privateKey  - User's Solana private key (JSON array string or base58)
- * @param {string} params.mongodbId   - Market's MongoDB _id
- * @returns {Promise<{ txHash: string, walletAddress: string } | null>}
- */
 async function claimWinnings({ privateKey, mongodbId }) {
-  if (!isDeployed()) {
-    console.warn("[ArkenSolana] Program not deployed — skipping claimWinnings");
-    return null;
-  }
+  if (!isDeployed()) { console.warn("[ArkenSolana] Not deployed"); return null; }
 
   const keypair = loadKeypair(privateKey);
   const program = getProgram(keypair);
 
   const marketIdArray = mongoIdToBytes32(mongodbId);
-  const [marketPda] = deriveMarketPDA(marketIdArray);
-  const [vaultPda] = deriveVaultPDA(marketPda);
+  const [marketPda]   = deriveMarketPDA(marketIdArray);
+  const [vaultPda]    = deriveVaultPDA(marketPda);
   const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey);
-
-  const usdcMint = new PublicKey(USDC_MINT_STR);
-  const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
+  const usdcMint      = new PublicKey(USDC_MINT_STR);
+  const userUsdcAta   = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
 
   const txHash = await program.methods
     .claimWinnings()
@@ -487,43 +608,26 @@ async function claimWinnings({ privateKey, mongodbId }) {
     })
     .rpc();
 
-  console.log(`[ArkenSolana] claimWinnings tx: ${txHash} from ${keypair.publicKey.toBase58()}`);
+  console.log(`[ArkenSolana] claimWinnings tx: ${txHash}`);
   return { txHash, walletAddress: keypair.publicKey.toBase58() };
 }
 
-// ─── Admin: Close Market Early ────────────────────────────────────────────────
+// ─── Admin: Close Market ──────────────────────────────────────────────────────
 
-/**
- * Early-close a Solana market before its endTime.
- * Only the market authority (admin keypair) can call this.
- *
- * @param {object} params
- * @param {string} params.adminPrivateKey  - Admin Solana keypair
- * @param {string} params.mongodbId        - Market's MongoDB _id
- * @returns {Promise<{ txHash: string } | null>}
- */
 async function closeMarket({ adminPrivateKey, mongodbId }) {
-  if (!isDeployed()) {
-    console.warn("[ArkenSolana] Program not deployed — skipping closeMarket");
-    return null;
-  }
+  if (!isDeployed()) { console.warn("[ArkenSolana] Not deployed"); return null; }
 
   const keypair = loadKeypair(adminPrivateKey);
   const program = getProgram(keypair);
 
-  const marketIdArray = mongoIdToBytes32(mongodbId);
-  const [marketPda] = deriveMarketPDA(marketIdArray);
-
+  const [marketPda] = deriveMarketPDA(mongoIdToBytes32(mongodbId));
   const txHash = await program.methods
     .closeMarket()
-    .accounts({
-      authority: keypair.publicKey,
-      market: marketPda,
-    })
+    .accounts({ authority: keypair.publicKey, market: marketPda })
     .signers([keypair])
     .rpc();
 
-  console.log("[ArkenSolana] Market closed early. TxHash:", txHash);
+  console.log("[ArkenSolana] Market closed. TxHash:", txHash);
   return { txHash };
 }
 
@@ -532,23 +636,25 @@ async function closeMarket({ adminPrivateKey, mongodbId }) {
 async function getMarketState(mongodbId) {
   if (!isDeployed()) return null;
   try {
-    const keypair = Keypair.generate(); // read-only, no signing needed
+    const keypair = Keypair.generate();
     const program = getProgram(keypair);
-    const marketIdArray = mongoIdToBytes32(mongodbId);
-    const [marketPda] = deriveMarketPDA(marketIdArray);
-    const marketAcc = await program.account.market.fetch(marketPda);
-    const outcomeCount = marketAcc.outcomeCount;
-    const pools = marketAcc.pools.slice(0, outcomeCount).map(p => p.toNumber() / 10 ** USDC_DECIMALS);
+    const [marketPda] = deriveMarketPDA(mongoIdToBytes32(mongodbId));
+    const acc = await program.account.market.fetch(marketPda);
+
+    const count = acc.outcomeCount;
+    const pools = acc.pools.slice(0, count).map(p => p.toNumber() / 10 ** USDC_DECIMALS);
     const totalPool = pools.reduce((a, b) => a + b, 0);
+
     return {
       pools,
-      outcomeCount,
+      outcomeCount: count,
       totalPool,
-      prices: pools.map(p => totalPool === 0 ? 1 / outcomeCount : p / totalPool),
-      status: marketAcc.status,
-      winningOption: marketAcc.winningOption,
-      platformFeePool: marketAcc.platformFeePool.toNumber() / 10 ** USDC_DECIMALS,
-      lpFeePool: marketAcc.lpFeePool.toNumber() / 10 ** USDC_DECIMALS,
+      prices: pools.map(p => totalPool === 0 ? 1 / count : p / totalPool),
+      status: acc.status,
+      winningOption: acc.winningOption,
+      creatorFeePool:  acc.creatorFeePool.toNumber()  / 10 ** USDC_DECIMALS,
+      lpFeePool:       acc.lpFeePool.toNumber()        / 10 ** USDC_DECIMALS,
+      treasuryFeePool: acc.treasuryFeePool.toNumber()  / 10 ** USDC_DECIMALS,
     };
   } catch (err) {
     console.error("[ArkenSolana] getMarketState failed:", err?.message);
@@ -556,25 +662,22 @@ async function getMarketState(mongodbId) {
   }
 }
 
-/**
- * Get USDC token balance for a Solana wallet address.
- * Returns 0 if the ATA doesn't exist yet (no USDC deposited).
- * @param {string} address - Solana base58 public key
- * @returns {Promise<number>} USDC balance as human-readable float
- */
+// ─── Read: USDC Balance ───────────────────────────────────────────────────────
+
 async function getUsdcBalance(address) {
   try {
     const connection = getConnection();
-    const pubKey = new PublicKey(address);
+    const pubKey  = new PublicKey(address);
     const usdcMint = new PublicKey(USDC_MINT_STR || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
     const ata = await getAssociatedTokenAddress(usdcMint, pubKey);
     const account = await connection.getTokenAccountBalance(ata);
     return account.value.uiAmount || 0;
   } catch {
-    // ATA doesn't exist yet — wallet has never received USDC
     return 0;
   }
 }
+
+// ─── Admin: Fund Gas (SOL) ────────────────────────────────────────────────────
 
 async function fundGas({ adminPrivateKey, toAddress, amountSol = 0.005 }) {
   const adminKeypair = loadKeypair(adminPrivateKey);
@@ -583,11 +686,7 @@ async function fundGas({ adminPrivateKey, toAddress, amountSol = 0.005 }) {
   const lamports = Math.floor(amountSol * LAMPORTS_PER_SOL);
 
   const transaction = new Transaction().add(
-    SystemProgram.transfer({
-      fromPubkey: adminKeypair.publicKey,
-      toPubkey,
-      lamports,
-    })
+    SystemProgram.transfer({ fromPubkey: adminKeypair.publicKey, toPubkey, lamports })
   );
 
   const { blockhash } = await connection.getLatestBlockhash();
@@ -602,13 +701,15 @@ async function fundGas({ adminPrivateKey, toAddress, amountSol = 0.005 }) {
 
 module.exports = {
   placeBet,
+  sellPosition,
+  addLiquidity,
   claimWinnings,
   createMarket,
   closeMarket,
   resolveMarket,
   getMarketState,
+  getUsdcBalance,
+  fundGas,
   mongoIdToBytes32,
   isDeployed,
-  fundGas,
-  getUsdcBalance,
 };

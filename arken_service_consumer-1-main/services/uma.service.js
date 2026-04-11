@@ -41,9 +41,9 @@ const ERC20_ABI = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getSigner() {
+function getSigner(userPrivateKey = null) {
   const rpcUrl = process.env.ARB_RPC;
-  const privateKey = process.env.EVM_PRIVATE_KEY;
+  const privateKey = userPrivateKey || process.env.EVM_PRIVATE_KEY;
   if (!rpcUrl || !privateKey) {
     throw new Error("ARB_RPC and EVM_PRIVATE_KEY must be set in .env");
   }
@@ -76,13 +76,16 @@ function getBondToken(signerOrProvider) {
  * @param {string} outcome    The proposed winning outcome string
  * @returns {{ assertionId: string, txHash: string, challengeEnd: Date }}
  */
-async function submitUMAAssertion(marketId, outcome) {
-  const signer = getSigner();
+async function submitUMAAssertion(marketId, outcome, userPrivateKey = null) {
+  const bondAmount = BigInt(process.env.UMA_BOND_AMOUNT || "0");
+  const liveness = Number(process.env.UMA_LIVENESS_PERIOD || "7200");
+
+  // Always attempt real on-chain — the contract enforces its own minimum bond.
+  // If bond=0 is below the minimum for the currency, the tx will revert with
+  // "Bond below minimum" and you'll know the exact value to set in UMA_BOND_AMOUNT.
+  const signer = getSigner(userPrivateKey);
   const oov3 = getOOv3(signer);
   const bondToken = getBondToken(signer);
-
-  const bondAmount = BigInt(process.env.UMA_BOND_AMOUNT || "100000000");
-  const liveness = Number(process.env.UMA_LIVENESS_PERIOD || "7200");
 
   // 1. Approve OOv3 to spend bond tokens (idempotent — skip if already approved)
   const currentAllowance = await bondToken.allowance(signer.address, process.env.UMA_OO_ADDRESS);
@@ -98,19 +101,15 @@ async function submitUMAAssertion(marketId, outcome) {
   const claimBytes = ethers.toUtf8Bytes(claimText);
 
   // 3. Call assertTruth
-  //    callbackRecipient = address(0) — we poll via cron instead of using callbacks
-  //    escalationManager  = address(0) — use default UMA escalation
-  //    identifier         = "ASSERT_TRUTH" encoded as bytes32
-  //    domainId           = bytes32(0)
   const ZERO_ADDRESS = ethers.ZeroAddress;
   const ASSERT_TRUTH_IDENTIFIER = ethers.encodeBytes32String("ASSERT_TRUTH");
   const ZERO_BYTES32 = ethers.ZeroHash;
 
   const tx = await oov3.assertTruth(
     claimBytes,
-    signer.address,       // asserter = our wallet
-    ZERO_ADDRESS,         // callbackRecipient
-    ZERO_ADDRESS,         // escalationManager
+    signer.address,
+    ZERO_ADDRESS,
+    ZERO_ADDRESS,
     liveness,
     process.env.UMA_BOND_CURRENCY,
     bondAmount,
@@ -121,10 +120,18 @@ async function submitUMAAssertion(marketId, outcome) {
   const receipt = await tx.wait();
   console.log(`[UMA] assertTruth tx: ${receipt.hash}`);
 
-  // 4. Parse AssertionMade event to get assertionId
+  // 4. Extract assertionId from AssertionMade event
+  // assertionId is the first indexed param → topics[1] on the log emitted by OOv3
   const iface = new ethers.Interface(OOV3_ABI);
+  const oov3Lower = (process.env.UMA_OO_ADDRESS || "").toLowerCase();
   let assertionId = null;
+
   for (const log of receipt.logs) {
+    // Only inspect logs from the OOv3 contract
+    if (log.address.toLowerCase() !== oov3Lower) continue;
+    if (!log.topics || log.topics.length < 2) continue;
+
+    // Try ABI parse first (exact signature match)
     try {
       const parsed = iface.parseLog(log);
       if (parsed && parsed.name === "AssertionMade") {
@@ -132,7 +139,11 @@ async function submitUMAAssertion(marketId, outcome) {
         break;
       }
     } catch {
-      // not our event — skip
+      // ABI topic hash mismatch — fall back to raw topic extraction.
+      // AssertionMade: topics[1] = assertionId (bytes32 indexed, first param)
+      assertionId = log.topics[1];
+      console.log(`[UMA] assertionId extracted from raw topics: ${assertionId}`);
+      break;
     }
   }
 

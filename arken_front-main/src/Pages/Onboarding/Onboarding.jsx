@@ -208,6 +208,16 @@ const Onboarding = () => {
   const { select, publicKey, connected, wallets } = useWallet();
   // const { address, isConnected } = useAccount();
   const [onboardStep, setOnboardStep] = useState(1);
+  const [showLinkEmailModal, setShowLinkEmailModal] = useState(false);
+  const [showRecoverModal, setShowRecoverModal] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailStep, setEmailStep] = useState('input'); // 'input' | 'otp'
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [recoverEmail, setRecoverEmail] = useState('');
+  const [recoverOtp, setRecoverOtp] = useState('');
+  const [recoverStep, setRecoverStep] = useState('email'); // 'email' | 'otp'
+  const [recoverLoading, setRecoverLoading] = useState(false);
   const [Address, setAddress] = useState(localStorage.getItem("walletAddress"));
   const [privateKey, setprivateKey] = useState();
   const { telegramUser } = useTelegramUser();
@@ -408,7 +418,8 @@ const Onboarding = () => {
         } else if (!walletCreationAttempted.current) {
           // New user — auto-create both ARB + SOL wallets on first load
           walletCreationAttempted.current = true;
-          createNewWalletFunc();
+          setWalletCreating(true);
+          createNewWalletFunc().finally(() => setWalletCreating(false));
         }
         // ──────────────────────────────────────────────────────────────────
       } else {
@@ -2411,6 +2422,7 @@ const Onboarding = () => {
     } catch (error) {}
   };
   const [walletLoad, setWalletload] = useState();
+  const [walletCreating, setWalletCreating] = useState(false);
   // const createNewWalletFunc = async (data) => {
   //   try {
   //     setWalletload(true);
@@ -3783,6 +3795,30 @@ const Onboarding = () => {
 
   return (
     <div className="cmmn_bdy_mainwrp" style={pageStyle.cmmn_bdy_mainwrp}>
+      {walletCreating && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.75)",
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          gap: "16px",
+        }}>
+          <div style={{
+            width: "48px", height: "48px",
+            border: "4px solid rgba(255,255,255,0.2)",
+            borderTopColor: "#fff",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }} />
+          <p style={{ color: "#fff", fontSize: "15px", margin: 0, fontWeight: 500 }}>
+            Setting up your wallet…
+          </p>
+          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "12px", margin: 0 }}>
+            Please wait, do not close the app
+          </p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
       <div className="obrd_wrp_main" style={pageStyle.obrd_wrp_main}>
         <div className="obrd_back_wrp" style={pageStyle.obrd_back_wrp}>
           <span
@@ -3803,281 +3839,149 @@ const Onboarding = () => {
 
         <div className="obrd_middl_main" style={pageStyle.obrd_middl_main}>
           {onboardStep == 1 ? (
-            <div className="obrd_middl_wrp" style={pageStyle.obrd_middl_wrp}>
-              <div
-                className="obrd_middl_ImgWrp"
-                style={pageStyle.obrd_middl_ImgWrp}
-              >
-                <ImageComponent
-                  styles={pageStyle.obrd_middl_tpImg}
-                  imgPic={obrd_middl_tpImg1}
-                  alt="obrd_middl_tpImg"
-                />
-                {/* <p>{telegraminitData ? telegraminitData : 'No data '}</p> */}
-                <h5 style={pageStyle.obrd_middl_tphead}>Connect your Wallet</h5>
-                {/* <p>{telegramId ? telegramId : "No data"}</p> */}
-                <p style={pageStyle.obrd_middl_tppara}>
-                  Choose a secure wallet to manage your funds
-                </p>
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0, padding: '0 0 24px' }}>
+              {/* Page title */}
+              <div style={{ padding: '24px 20px 16px' }}>
+                <h5 style={{ fontSize: 22, fontWeight: 800, letterSpacing: -0.5, marginBottom: 4, color: '#f0f0f8' }}>Connect Wallet</h5>
               </div>
-              {/* {Address?Address:"==================="} */}
-              <pre
-                style={{
-                  fontSize: 10,
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-all",
-                  background: "#000",
-                  color: "#0f0",
-                  padding: 8,
-                  textAlign: "center",
-                }}
-              >
-                {/* {window.Telegram?.WebApp?.initData || "NO INITDATA"}  */}
-              </pre>
-              <h5
-                className="obrd_middl_cntrPara"
-                style={pageStyle.obrd_middl_cntrPara}
-              >
-                <RiShieldCheckFill style={pageStyle.obrd_middl_cntpricon} />{" "}
-                Smart Contract Protection
-              </h5>
-              {/* <button onClick={() => }>
-        Connect Ethereum (MetaMask)
-      </button>
-<div className="wallet-card">
-        <p>Connected: <b>{address?.slice(0, 6)}...{address?.slice(-4)}</b></p>
-        <p>Balance: {balance?.formatted} {balance?.symbol}</p>
-        <button onClick={() => disconnect()} className="btn-secondary">
-          Disconnect
-        </button>
-      </div> */}
-              {/* <WalletMultiButton /> */}
-              {/* {window.Telegram?.WebApp?.initData  ?window.Telegram?.WebApp?.initData :"intidd"}
-          {telegramUser?.telegramId  ?telegramUser.telegramId:"telegramUser.telegramId" }
-          {teleId?teleId:"teleId"} */}
-              {/* Reconnect to existing custodial wallet — shown when user has a previously created wallet */}
+              <div style={{ padding: '0 8px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {/* Smart Contract Protection banner */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.25)', borderRadius: 12, padding: '12px 16px' }}>
+                <RiShieldCheckFill style={{ color: '#22c55e', fontSize: 18, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: '#22c55e', fontWeight: 500 }}>Smart Contract Protection on all wallets</span>
+              </div>
+
+              {/* Reconnect to existing custodial wallet */}
               {custodialWallets.length > 0 && !walletaccess && (
-                <div style={{ marginBottom: 16 }}>
-                  <p
-                    style={{
-                      fontSize: 12,
-                      color: "rgba(255,255,255,0.5)",
-                      marginBottom: 8,
-                      textAlign: "center",
-                    }}
-                  >
-                    You have an existing wallet
-                  </p>
+                <>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 1, marginTop: 4 }}>YOUR WALLET</div>
                   {custodialWallets.map((w, i) => (
-                    <div
+                    <button
                       key={i}
-                      className="obrd_wllet_itm"
-                      style={{
-                        ...pageStyle.obrd_wllet_itm,
-                        borderColor: "rgba(99,102,241,0.5)",
-                        background: "rgba(99,102,241,0.08)",
-                        marginBottom: 8,
-                      }}
                       onClick={reconnectCustodialWallet}
+                      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: 'rgba(99,102,241,0.08)', border: '1.5px solid rgba(99,102,241,0.4)', borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left' }}
                     >
-                      <ImageComponent
-                        styles={pageStyle.obrd_wllet_img}
-                        imgPic={walletIMG}
-                        alt="own_wallet"
-                      />
-                      <div className="obrd_wllet_itmcnt">
-                        <h6 style={pageStyle.obrd_wllet_head}>
-                          My {w.network} Wallet
-                        </h6>
-                        <p
-                          style={{ ...pageStyle.obrd_wllet_para, fontSize: 11 }}
-                        >
-                          {w.address.slice(0, 8)}...{w.address.slice(-6)}
-                        </p>
+                      <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(99,102,241,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(99,102,241,0.3)', fontSize: 22 }}>
+                        👛
                       </div>
-                      <GoArrowRight style={pageStyle.obrd_wllet_icon} />
-                    </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: '#f0f0f8' }}>My {w.network} Wallet</div>
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 3, fontFamily: 'monospace' }}>{w.address.slice(0, 8)}...{w.address.slice(-6)}</div>
+                      </div>
+                      <GoArrowRight style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }} />
+                    </button>
                   ))}
-                  <div
-                    style={{
-                      textAlign: "center",
-                      fontSize: 11,
-                      color: "rgba(255,255,255,0.3)",
-                      marginTop: 8,
-                      marginBottom: 4,
-                    }}
+                  <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.25)', letterSpacing: 1 }}>— OR CONNECT A DIFFERENT WALLET —</div>
+                </>
+              )}
+
+              {/* SELECT WALLET label */}
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 1, marginTop: 4 }}>SELECT WALLET</div>
+
+              {/* Wallet option cards */}
+              {walletData.map((item, index) => {
+                const isLoading = walletLoading === item.keys;
+                const isConnectedWallet =
+                  (walletName && normalizeWalletName(walletName) === normalizeWalletName(item.keys) && walletaccess) ||
+                  (userWallet.isConnected && normalizeWalletName(userWallet.walletName) === normalizeWalletName(item.keys));
+                return (
+                  <button
+                    key={index}
+                    onClick={() => connectWallet(item.keys)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 18px', background: isConnectedWallet ? 'rgba(124,58,237,0.1)' : '#12121f', border: `1.5px solid ${isConnectedWallet ? 'rgba(124,58,237,0.5)' : 'rgba(28,28,46,1)'}`, borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left' }}
                   >
-                    — or connect a different wallet —
-                  </div>
+                    <div style={{ width: 48, height: 48, borderRadius: 14, background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <ImageComponent styles={{ width: 32, height: 32, objectFit: 'contain' }} imgPic={item.img} alt={item.heading} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: '#f0f0f8', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {item.heading}
+                        {isConnectedWallet && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#22c55e', background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: 10, padding: '2px 7px' }}>Connected</span>
+                        )}
+                      </div>
+                      <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 3 }}>{item.description}</div>
+                    </div>
+                    {isLoading && loadstatus
+                      ? <FaSpinner className="rotating-spinner" style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }} />
+                      : <GoArrowRight style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }} />
+                    }
+                  </button>
+                );
+              })}
+
+              {/* Terms note */}
+              <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 14, padding: '14px 16px' }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>By connecting, you agree to Arken's Terms of Service. Your keys remain in your wallet at all times.</div>
+              </div>
+
+              {/* Chain toggle — shown after managed wallet connects */}
+              {!loadingwallet && walletName === "newwallet" && walletaccess && (bothWallets.arb || bothWallets.sol) && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  {["ARB", "SOL"].map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => {
+                        switchChain(c);
+                        const w = bothWallets?.[c.toLowerCase()];
+                        if (w?.address) { setAddress(w.address); localStorage.setItem("walletAddress", w.address); }
+                      }}
+                      style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: "pointer", background: activeChain === c ? "#7c3aed" : "rgba(255,255,255,0.08)", color: "#fff", fontWeight: activeChain === c ? 700 : 400, fontSize: 13 }}
+                    >
+                      {c === "ARB" ? "Arbitrum (ARB)" : "Solana (SOL)"}
+                    </button>
+                  ))}
                 </div>
               )}
 
-              <div className="obrd_wllet_wrp" style={pageStyle.obrd_wllet_wrp}>
-                {walletData.map((item, index) => {
-                  const isLoading = walletLoading === item.keys; // only true for the clicked wallet
-                  const isConnecteds = wallet?.name === item.keys;
-                  console.log(isConnected, Address, walletaccess, "ssdsad");
-                  return (
-                    <div
-                      key={index}
-                      className="obrd_wllet_itm"
-                      style={pageStyle.obrd_wllet_itm}
-                      onClick={() => connectWallet(item.keys)}
-                    >
-                      <ImageComponent
-                        styles={pageStyle.obrd_wllet_img}
-                        imgPic={item.img}
-                        alt="obrd_middl_wllImg"
-                      />
-                      <div className="obrd_wllet_itmcnt">
-                        {/* <h6 style={pageStyle.obrd_wllet_head}>
-                          {item.heading}
-                          {walletName &&
-                          normalizeWalletName(walletName) ==
-                            normalizeWalletName(item.keys) &&
-                          // Address ||address || isConnected &&
-                          walletaccess ? (
-                            <span style={pageStyle.obrd_wllet_headSpan}>
-                              Connected
-                              {/* <p>
-                                {walletName} {item.keys}
-                              </p> */}
-                        {/* </span>
-                          ) : (
-                            ""
-                          )}
-                        </h6> */}
-                        <h6 style={pageStyle.obrd_wllet_head}>
-                          {item.heading}
-                          {/* {userWallet.isConnected }
-  {normalizeWalletName(userWallet.walletName) }
-  {normalizeWalletName(item.keys) }
-  {walletName } */}
-
-                          {(walletName &&
-                            normalizeWalletName(walletName) ===
-                              normalizeWalletName(item.keys) &&
-                            walletaccess) ||
-                          (userWallet.isConnected &&
-                            normalizeWalletName(userWallet.walletName) ===
-                              normalizeWalletName(item.keys)) ? (
-                            <span style={pageStyle.obrd_wllet_headSpan}>
-                              Connected
-                            </span>
-                          ) : (
-                            ""
-                          )}
-                        </h6>
-
-                        <p style={pageStyle.obrd_wllet_para}>
-                          {item.description}
-                        </p>
-                        {isLoading && loadstatus ? (
-                          <FaSpinner className="rotating-spinner" />
-                        ) : //   <i className="fa-solid fa-spinner fa-spin"></i>
-                        !isConnecteds ? (
-                          <GoArrowRight style={pageStyle.obrd_wllet_icon} />
-                        ) : (
-                          <GoArrowRight style={pageStyle.obrd_wllet_icon} />
-                        )}
-
-                        {/* { ?
-                        <i class="fa-solid fa-spinner fa-spin"></i>
-                        // <FaSpinner />
-                        :
-                        wallet?.name != item.keys && (
-                          <GoArrowRight style={pageStyle.obrd_wllet_icon} />
-                        )
-                        } */}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* {`phantom address ${Address}`} 
-             <button onClick={connectPhantomnew}>Connect wallet</button>
-              <button onClick={connectSolflaremnew}>Solflare wallet</button>
-              {/* {isConnected || Address && walletaccess ?( */}
-
-              {!loadingwallet && (
+              {/* Continue / Disconnect buttons */}
+              {!loadingwallet && ((Address && walletaccess) || userWallet.isConnected) && (
                 <>
-                  {/* Chain toggle — shown after managed wallet connects */}
-                  {walletName === "newwallet" && walletaccess && (bothWallets.arb || bothWallets.sol) && (
-                    <div style={{ display: "flex", gap: 8, margin: "12px 0", width: "100%" }}>
-                      {["ARB", "SOL"].map((c) => (
-                        <button
-                          key={c}
-                          onClick={() => {
-                            switchChain(c);
-                            const w = bothWallets?.[c.toLowerCase()];
-                            if (w?.address) {
-                              setAddress(w.address);
-                              localStorage.setItem("walletAddress", w.address);
-                            }
-                          }}
-                          style={{
-                            flex: 1,
-                            padding: "10px 0",
-                            borderRadius: 8,
-                            border: "none",
-                            cursor: "pointer",
-                            background: activeChain === c ? "#6366f1" : "rgba(255,255,255,0.08)",
-                            color: "#fff",
-                            fontWeight: activeChain === c ? 700 : 400,
-                            fontSize: 13,
-                          }}
-                        >
-                          {c === "ARB" ? "Arbitrum (ARB)" : "Solana (SOL)"}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {((Address && walletaccess) || userWallet.isConnected) && (
-                    <button
-                      className="onbord_subtbtn"
-                      style={pageStyle.onbord_subtbtn}
-                      onClick={() => handleonboardStep(2)}
-                    >
-                      Continue
-                    </button>
-                  )}
-
-                  {((Address && walletaccess) || userWallet.isConnected) && (
-                    <button
-                      className="onbord_subtbtn"
-                      style={pageStyle.onbord_subtbtn}
-                      onClick={disconnectWallet}
-                    >
-                      Disconnect Wallet
-                    </button>
-                  )}
+                  <button
+                    style={{ width: '100%', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer', marginTop: 4 }}
+                    onClick={() => handleonboardStep(2)}
+                  >
+                    Continue
+                  </button>
+                  <button
+                    style={{ width: '100%', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 14, padding: '12px 0', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                    onClick={disconnectWallet}
+                  >
+                    Disconnect Wallet
+                  </button>
                 </>
               )}
-              {/* {loadingwallet ? (
-                ""
-              ) : Address && walletaccess ? (
-                <button
-                  className="onbord_subtbtn"
-                  style={pageStyle.onbord_subtbtn}
-                  onClick={() => handleonboardStep(2)}
-                >
-                  Continue
-                </button>
-              ) : (
-                ""
-              )}
-              {Address && walletaccess ? (
-                <button
-                  className="onbord_subtbtn"
-                  style={pageStyle.onbord_subtbtn}
-                  onClick={disconnectWallet}
-                >
-                  Disconnect Wallet
-                </button>
-              ) : (
-                ""
-              )} */}
+
+              {/* Divider */}
+              <div style={{ textAlign: 'center', fontSize: 11, color: 'rgba(255,255,255,0.2)', letterSpacing: 1, marginTop: 4 }}>— ACCOUNT OPTIONS —</div>
+
+              {/* Link Email */}
+              <button
+                onClick={() => setShowLinkEmailModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: '#12121f', border: '1.5px solid rgba(28,28,46,1)', borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(99,102,241,0.2)', fontSize: 20 }}>📧</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#f0f0f8' }}>Link Email</div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>Backup your wallet & enable recovery</div>
+                </div>
+                <GoArrowRight style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }} />
+              </button>
+
+              {/* Recover Account */}
+              <button
+                onClick={() => setShowRecoverModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: '#12121f', border: '1.5px solid rgba(28,28,46,1)', borderRadius: 16, cursor: 'pointer', width: '100%', textAlign: 'left' }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: '1px solid rgba(99,102,241,0.2)', fontSize: 20 }}>🔄</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#f0f0f8' }}>Recover Account</div>
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 2 }}>Lost Telegram access? Recover via email</div>
+                </div>
+                <GoArrowRight style={{ color: 'rgba(255,255,255,0.4)', fontSize: 18 }} />
+              </button>
+
+              </div>{/* end padding container */}
             </div>
           ) : onboardStep === 2 ? (
             <div className="obrd_middl_wrp" style={pageStyle.obrd_middl_wrp}>
@@ -4610,6 +4514,112 @@ const Onboarding = () => {
           </div>
         </Box>
       </Modal>
+
+      {/* Link Email Modal */}
+      {showLinkEmailModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', zIndex: 300 }}>
+          <div style={{ width: '100%', background: '#12121f', borderRadius: '20px 20px 0 0', padding: 24, border: '1px solid rgba(99,102,241,0.2)', borderBottom: 'none' }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6, color: '#f0f0f8' }}>Link Email</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>
+              {emailStep === 'input' ? 'Enter your email to receive a verification code.' : 'Enter the 6-digit code sent to your email.'}
+            </div>
+            {emailStep === 'input' ? (
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={emailInput}
+                onChange={e => setEmailInput(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '12px 14px', color: '#f0f0f8', fontSize: 15, outline: 'none', marginBottom: 14, fontFamily: 'inherit' }}
+              />
+            ) : (
+              <input
+                type="text"
+                placeholder="6-digit code"
+                value={emailOtp}
+                onChange={e => setEmailOtp(e.target.value)}
+                maxLength={6}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '12px 14px', color: '#f0f0f8', fontSize: 15, outline: 'none', marginBottom: 14, fontFamily: 'inherit', letterSpacing: 4 }}
+              />
+            )}
+            <button
+              disabled={emailLoading}
+              onClick={async () => {
+                if (emailLoading) return;
+                setEmailLoading(true);
+                try {
+                  const tid = telegramUser?.id || window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+                  if (emailStep === 'input') {
+                    const r = await postMethod({ apiUrl: apiService.linkEmail, payload: { telegramId: tid, email: emailInput } });
+                    if (r?.success) { setEmailStep('otp'); toast.success('OTP sent!'); }
+                    else toast.error(r?.message || 'Failed');
+                  } else {
+                    const r = await postMethod({ apiUrl: apiService.verifyEmailOtp, payload: { telegramId: tid, email: emailInput, otp: emailOtp } });
+                    if (r?.success) { setShowLinkEmailModal(false); setEmailStep('input'); setEmailInput(''); setEmailOtp(''); toast.success('Email linked!'); }
+                    else toast.error(r?.message || 'Invalid code');
+                  }
+                } finally { setEmailLoading(false); }
+              }}
+              style={{ width: '100%', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 0', fontWeight: 700, fontSize: 14, cursor: emailLoading ? 'not-allowed' : 'pointer', opacity: emailLoading ? 0.6 : 1, marginBottom: 10 }}
+            >
+              {emailLoading ? 'Please wait...' : emailStep === 'input' ? 'Send Code' : 'Verify & Link'}
+            </button>
+            <button onClick={() => { setShowLinkEmailModal(false); setEmailStep('input'); setEmailInput(''); setEmailOtp(''); }} style={{ width: '100%', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '11px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Recover Account Modal */}
+      {showRecoverModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', zIndex: 300 }}>
+          <div style={{ width: '100%', background: '#12121f', borderRadius: '20px 20px 0 0', padding: 24, border: '1px solid rgba(99,102,241,0.2)', borderBottom: 'none' }}>
+            <div style={{ fontWeight: 700, fontSize: 17, marginBottom: 6, color: '#f0f0f8' }}>Recover Account</div>
+            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>
+              {recoverStep === 'email' ? 'Enter the email linked to your old account.' : 'Enter the recovery code sent to your email.'}
+            </div>
+            {recoverStep === 'email' ? (
+              <input
+                type="email"
+                placeholder="your@email.com"
+                value={recoverEmail}
+                onChange={e => setRecoverEmail(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '12px 14px', color: '#f0f0f8', fontSize: 15, outline: 'none', marginBottom: 14, fontFamily: 'inherit' }}
+              />
+            ) : (
+              <input
+                type="text"
+                placeholder="6-digit code"
+                value={recoverOtp}
+                onChange={e => setRecoverOtp(e.target.value)}
+                maxLength={6}
+                style={{ width: '100%', boxSizing: 'border-box', background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(99,102,241,0.3)', borderRadius: 12, padding: '12px 14px', color: '#f0f0f8', fontSize: 15, outline: 'none', marginBottom: 14, fontFamily: 'inherit', letterSpacing: 4 }}
+              />
+            )}
+            <button
+              disabled={recoverLoading}
+              onClick={async () => {
+                if (recoverLoading) return;
+                setRecoverLoading(true);
+                try {
+                  const newTid = telegramUser?.id || window.Telegram?.WebApp?.initDataUnsafe?.user?.id;
+                  if (recoverStep === 'email') {
+                    const r = await postMethod({ apiUrl: apiService.initiateAccountRecovery, payload: { email: recoverEmail } });
+                    if (r?.success) { setRecoverStep('otp'); toast.success('Recovery code sent!'); }
+                    else toast.error(r?.message || 'Email not found');
+                  } else {
+                    const r = await postMethod({ apiUrl: apiService.confirmAccountRecovery, payload: { email: recoverEmail, otp: recoverOtp, newTelegramId: newTid } });
+                    if (r?.success) { setShowRecoverModal(false); setRecoverStep('email'); setRecoverEmail(''); setRecoverOtp(''); toast.success('Account recovered! Please reload the app.'); }
+                    else toast.error(r?.message || 'Recovery failed');
+                  }
+                } finally { setRecoverLoading(false); }
+              }}
+              style={{ width: '100%', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 0', fontWeight: 700, fontSize: 14, cursor: recoverLoading ? 'not-allowed' : 'pointer', opacity: recoverLoading ? 0.6 : 1, marginBottom: 10 }}
+            >
+              {recoverLoading ? 'Please wait...' : recoverStep === 'email' ? 'Send Recovery Code' : 'Confirm Recovery'}
+            </button>
+            <button onClick={() => { setShowRecoverModal(false); setRecoverStep('email'); setRecoverEmail(''); setRecoverOtp(''); }} style={{ width: '100%', background: 'transparent', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '11px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

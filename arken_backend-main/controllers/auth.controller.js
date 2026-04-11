@@ -869,10 +869,11 @@ exports.closeMarketHandler = async (req, res) => {
 };
 
 exports.submitUMAAssertionHandler = async (req, res) => {
+  // 120s — on-chain assertTruth tx can take 30-90s on Sepolia
   const result = await publishAndWait("markets_queue", {
     ...req.body,
     action: queuename.submitUMAAssertion,
-  });
+  }, 120000);
   res.json({
     action: queuename.submitUMAAssertion,
     ...result,

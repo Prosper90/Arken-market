@@ -105,6 +105,16 @@ createdAt: {
       default: 0,
     },
 
+    // Private key export tracking
+    lastKeyExportAt: { type: Date, default: null },
+
+    // Email linking + account recovery
+    email: { type: String, default: null, index: true, sparse: true },
+    emailVerified: { type: Boolean, default: false },
+    emailOtp: { type: String, default: null },
+    emailOtpExpiry: { type: Date, default: null },
+    recoveryPasswordHash: { type: String, default: null },
+
   },
   { timestamps: true }
 );

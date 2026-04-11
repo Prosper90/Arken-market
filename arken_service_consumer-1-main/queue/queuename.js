@@ -69,6 +69,10 @@ const queueNamelist = {
   addMarketLiquidity: "addMarketLiquidity",
   sweepUserDeposits: "sweepUserDeposits",
   sellPosition: "sellPosition",
+  linkEmail: "linkEmail",
+  verifyEmailOtp: "verifyEmailOtp",
+  initiateAccountRecovery: "initiateAccountRecovery",
+  confirmAccountRecovery: "confirmAccountRecovery",
 
 };
 

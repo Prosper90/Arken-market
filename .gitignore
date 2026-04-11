@@ -80,6 +80,7 @@ twobots.jpg
 
 # ── Custom Folders ────────────
 /rain
+/new_updates
 
 # ── Production reference snapshots (local only) ────────────────────────────
 **/onboarding_production.jsx

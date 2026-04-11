@@ -1711,6 +1711,79 @@ if (data.startsWith("search_page_")) {
     }
 
     // --- Wallet dashboard callbacks ---
+    // ── Export Private Key ────────────────────────────────────────────────────
+    if (data === "export_key") {
+      bot.answerCallbackQuery(query.id);
+      const chatId = query.message.chat.id;
+      const msgId = query.message.message_id;
+
+      // Daily limit: 1 export per 24 hours
+      const user = await User.findOne({ telegramId });
+      const lastExport = user?.lastKeyExportAt;
+      if (lastExport && (Date.now() - new Date(lastExport).getTime()) < 24 * 60 * 60 * 1000) {
+        return bot.editMessageText(
+          "⚠️ *Daily limit reached.*\n\nYou can export your private key once every 24 hours.",
+          { chat_id: chatId, message_id: msgId, parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_wallet" }]] } }
+        );
+      }
+
+      return bot.editMessageText(
+        "🔑 *Export Private Key*\n\n⚠️ Your private key gives *full access* to your wallet.\nNever share it with anyone — Arken will never ask for it.\n\nSelect which chain key to export:",
+        {
+          chat_id: chatId, message_id: msgId, parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "🔷 Arbitrum Key", callback_data: "export_key_arb" },
+                { text: "💎 Solana Key", callback_data: "export_key_sol" },
+              ],
+              [{ text: "← Back", callback_data: "back_to_wallet" }],
+            ],
+          },
+        }
+      );
+    }
+
+    if (data === "export_key_arb" || data === "export_key_sol") {
+      bot.answerCallbackQuery(query.id);
+      const chatId = query.message.chat.id;
+      const network = data === "export_key_arb" ? "ARB" : "SOL";
+
+      const walletDoc = await userPublicWalletModel.findOne({ telegramId });
+      const wallet = walletDoc?.wallets?.find(w => w.network === network || (network === "ARB" && w.network === "EVM"));
+
+      if (!wallet?.privateKey) {
+        return bot.sendMessage(chatId,
+          `❌ No ${network} wallet found on your account.`,
+          { reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_wallet" }]] } }
+        );
+      }
+
+      try {
+        const decryptedKey = await common.decrypt(wallet.privateKey);
+
+        // Audit log
+        await User.findOneAndUpdate({ telegramId }, { lastKeyExportAt: new Date() });
+        console.log(`[KEY_EXPORT] telegramId=${telegramId} network=${network} at=${new Date().toISOString()}`);
+
+        const keyMsg = await bot.sendMessage(chatId,
+          `🔑 *Your ${network} Private Key:*\n\n\`${decryptedKey}\`\n\n⚠️ *This message will self-destruct in 30 seconds.*\nNever share this with anyone. Arken will never ask for your key.`,
+          { parse_mode: "Markdown" }
+        );
+
+        // Auto-delete after 30 seconds
+        setTimeout(() => {
+          bot.deleteMessage(chatId, keyMsg.message_id).catch(() => {});
+        }, 30000);
+
+      } catch (err) {
+        console.error("[KEY_EXPORT] decrypt error:", err.message);
+        bot.sendMessage(chatId, "❌ Could not retrieve your key. Please try again later.");
+      }
+      return;
+    }
+
     if (data === "wallet_deposit") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
@@ -2852,6 +2925,9 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
               [
                 { text: "👥 My Referrals", callback_data: "wallet_referrals" },
                 { text: "📋 Bet History", callback_data: "wallet_history" },
+              ],
+              [
+                { text: "🔑 Export Private Key", callback_data: "export_key" },
               ],
             ],
           },

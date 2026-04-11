@@ -85,6 +85,7 @@ const marketSchema = new mongoose.Schema(
     umaSubmittedAt: { type: Date, default: null },
 
     // UMA challenge period tracking
+    umaSettledTxHash: { type: String, default: null },
     umaChallengePeriodEnd: { type: Date, default: null },
     umaStatus: {
       type: String,
