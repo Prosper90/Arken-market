@@ -6918,7 +6918,7 @@ async function linkEmailHandler(data) {
       { emailOtp: otp, emailOtpExpiry: expiry },
     );
 
-    await mail.sendEMail({
+    await mail.sendMail({
       from: process.env.FROM_EMAIL,
       to: email,
       subject: "Arken — Email Verification Code",
@@ -6952,7 +6952,7 @@ async function verifyEmailOtpHandler(data) {
     );
 
     // Send wallet backup notification email
-    await mail.sendEMail({
+    await mail.sendMail({
       from: process.env.FROM_EMAIL,
       to: email,
       subject: "Arken — Email Linked Successfully",
@@ -6983,7 +6983,7 @@ async function initiateAccountRecoveryHandler(data) {
 
     await usersDB.findOneAndUpdate({ _id: user._id }, { emailOtp: otp, emailOtpExpiry: expiry });
 
-    await mail.sendEMail({
+    await mail.sendMail({
       from: process.env.FROM_EMAIL,
       to: email,
       subject: "Arken — Account Recovery Code",
