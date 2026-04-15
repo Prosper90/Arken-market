@@ -910,10 +910,7 @@ What would you like to do?`,
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [
-              [
-                { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
-              ],
+              [{ text: "🚀 Create Wallet", callback_data: "create_both_wallets" }],
               [{ text: "📥 Open Deposit App", web_app: { url: depositUrl } }],
             ],
           },

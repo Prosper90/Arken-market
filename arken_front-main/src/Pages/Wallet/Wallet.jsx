@@ -21,11 +21,10 @@ const UsdcLogo = () => (
   </svg>
 );
 
+// Only USDC withdrawals are supported (USDC SPL on Solana, USDC ERC-20 on Arbitrum)
 const COINS = {
-  SOL:       { name: 'Solana',       network: 'Solana Mainnet', Logo: SolLogo,  color: '#9945FF', chain: 'SOL' },
   'USDC-SOL':{ name: 'USDC (SPL)',   network: 'Solana SPL Token', Logo: UsdcLogo, color: '#2775CA', chain: 'SOL' },
   'USDC-ARB':{ name: 'USDC (ERC-20)',network: 'Arbitrum One',   Logo: UsdcLogo, color: '#2775CA', chain: 'ARB' },
-  ARB:       { name: 'Arbitrum ETH', network: 'Arbitrum One',   Logo: ArbLogo,  color: '#28A0F0', chain: 'ARB' },
 };
 
 const CoinRow = ({ coinKey, selected, onSelect }) => {

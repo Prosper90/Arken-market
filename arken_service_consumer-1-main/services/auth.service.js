@@ -3660,8 +3660,15 @@ async function getCurrenyListHandler(data) {
 
 async function userWithdrawHandler(data) {
   try {
-    // 1. Validate inputs
-    const { telegramId, currency, Amount, Address } = data;
+    // 1. Validate inputs — normalize field names (frontend sends lowercase)
+    const telegramId = data.telegramId;
+    const Amount = data.Amount || data.amount;
+    const Address = data.Address || data.toAddress;
+    // Normalize currency keys from frontend (e.g. 'USDC-SOL' → 'USDC', 'USDC-ARB' → 'ARB')
+    let currency = data.currency;
+    if (currency === 'USDC-SOL') currency = 'USDC';
+    else if (currency === 'USDC-ARB') currency = 'ARB';
+
     if (!telegramId || !currency || !Amount || !Address) {
       return { success: false, Message: "Invalid fields!" };
     }
@@ -3697,7 +3704,7 @@ async function userWithdrawHandler(data) {
     };
     const _evmAdminWallet = () => {
       if (!process.env.EVM_PRIVATE_KEY) throw new Error("EVM_PRIVATE_KEY not set");
-      const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || ARB_RPC);
+      const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
       return new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider);
     };
 
@@ -4069,7 +4076,7 @@ const sig = await sendAndConfirmTransaction(
     // }
      else {
       try {
-        const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL);
+        const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
         const _decryptedPk = await common.decrypt(selectedWallet.privateKey);
         const wallet = new ethers.Wallet(_decryptedPk, provider);
         // const usdc = new ethers.Contract(
@@ -5142,7 +5149,7 @@ async function getEVMTransactions(address, network) {
 
 const NETWORK_CONFIG = {
   ARB: {
-    rpcUrl: process.env.ARB_RPC_URL || 'https://arb1.arbitrum.io/rpc',
+    rpcUrl: process.env.ARB_RPC_URL || process.env.ARB_RPC || 'https://arb1.arbitrum.io/rpc',
     chainId: 42161,
     nativeCurrency: 'ARB',
     gasLimit: 500000,
