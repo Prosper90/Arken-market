@@ -353,14 +353,7 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Group Predictions banner */}
-        <div style={{ background: `linear-gradient(135deg, ${C.purple}cc, #4f46e5bb)`, borderRadius: 12, padding: '12px 14px', marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14 }}>Group Predictions</div>
-            <div style={{ fontSize: 11, opacity: 0.75, marginTop: 2 }}>Predict whether group calls will rug or succeed</div>
-          </div>
-          <div style={{ fontSize: 20, opacity: 0.8 }}>📡</div>
-        </div>
+        {/* Group Predictions banner — disabled */}
 
         {/* News ticker */}
         {news.length > 0 && (

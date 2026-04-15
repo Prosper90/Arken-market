@@ -399,48 +399,7 @@ const Wallet = () => {
           </div>
         )}
 
-        {/* Connected wallet */}
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 12 }}>CONNECTED WALLET</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C.purple}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 16 }}>👛</span>
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{displayName}</div>
-              <div style={{ fontSize: 12, color: C.muted }}>Custodial Wallet</div>
-            </div>
-          </div>
-
-          {/* Chain tabs for custodial */}
-          {walletName === 'newwallet' && custodialWallets.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-              {['ARB', 'SOL'].map(c => (
-                <button
-                  key={c}
-                  onClick={() => {
-                    switchChain(c);
-                    const w = custodialWallets.find(x => x.network === c);
-                    if (w) { setWalletAddress(w.address); localStorage.setItem('walletAddress', w.address); }
-                  }}
-                  style={{ flex: 1, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', background: activeChain === c ? C.purple : C.surface, color: activeChain === c ? '#fff' : C.muted, fontWeight: activeChain === c ? 700 : 400, fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-                >
-                  {c === 'ARB' ? <><ArbLogo /> Arbitrum</> : <><SolLogo /> Solana</>}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface, borderRadius: 10, padding: '10px 14px', border: `1px solid ${C.border}` }}>
-            <span style={{ fontSize: 12, color: C.sub, fontFamily: 'monospace' }}>{truncateAddress(activeWalletAddress)}</span>
-            <button
-              onClick={() => copy(activeWalletAddress, 'addr')}
-              style={{ background: copied === 'addr' ? `${C.green}15` : C.purpleGlow, color: copied === 'addr' ? C.green : C.purpleL, border: `1px solid ${copied === 'addr' ? C.green + '30' : C.purpleGlow2}`, borderRadius: 8, padding: '5px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-            >
-              {copied === 'addr' ? <><CheckIcon /> Copied</> : <><CopyIcon /> Copy</>}
-            </button>
-          </div>
-        </div>
+        {/* Connected wallet — hidden per client request */}
 
         {/* Supported networks */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>

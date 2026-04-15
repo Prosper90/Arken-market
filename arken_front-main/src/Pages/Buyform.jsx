@@ -256,11 +256,10 @@ const Buyform = ({ market, handleBotClose, selectedOutcome, predictionId, betAmo
             <div style={{ background: C.card, borderRadius: 12, padding: '12px 14px', border: `1px solid ${C.border}`, marginBottom: 12 }}>
               {[
                 { l: 'Current Price', v: `${(currentPrice * 100).toFixed(0)}¢ per share` },
-                { l: 'Platform Fee (2%)', v: `-$${fee}`, col: C.red },
                 { l: 'Net Staked', v: `$${netStaked}` },
                 { l: 'Price Impact', v: `~${priceImpact}%`, col: highImpact ? '#f59e0b' : C.green },
               ].map((r, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i < 3 ? `1px solid ${C.border}` : 'none' }}>
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: i < 2 ? `1px solid ${C.border}` : 'none' }}>
                   <span style={{ color: C.muted, fontSize: 12 }}>{r.l}</span>
                   <span style={{ color: r.col || C.text, fontWeight: 600, fontSize: 12 }}>{r.v}</span>
                 </div>

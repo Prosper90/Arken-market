@@ -683,15 +683,12 @@ async function initializeTelegramBot() {
       const hasWallet = walletDoc && walletDoc.wallets && walletDoc.wallets.length > 0;
       if (!hasWallet) {
         bot.sendMessage(chatId,
-          "💼 *No Wallet Found*\n\nCreate a custodial wallet to get started. Your deposit address will be generated instantly — send funds to it and your balance will be credited automatically.",
+          "💼 *No Wallet Found*\n\nCreate your Arken wallet to get started. Both an Arbitrum and Solana wallet will be created instantly.",
           {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [
-                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
-                ],
+                [{ text: "🚀 Create Wallet", callback_data: "create_both_wallets" }],
               ],
             },
           },
@@ -1799,8 +1796,7 @@ if (data.startsWith("search_page_")) {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+                  { text: "🚀 Create Wallet", callback_data: "create_both_wallets" },
                 ],
                 [{ text: "← Back", callback_data: "back_to_wallet" }],
               ],
@@ -1953,8 +1949,7 @@ if (data.startsWith("search_page_")) {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "💎 Create SOL Wallet", callback_data: "create_sol_wallet" },
-                  { text: "🔷 Create ARB Wallet", callback_data: "create_arb_wallet" },
+                  { text: "🚀 Create Wallet", callback_data: "create_both_wallets" },
                 ],
                 [{ text: "← Back", callback_data: "back_to_start" }],
               ],
@@ -2011,37 +2006,34 @@ if (data.startsWith("search_page_")) {
       );
     }
 
-    // --- Wallet creation callbacks (bot-side custodial wallet creation) ---
-    if (data === "create_sol_wallet" || data === "create_arb_wallet") {
+    // --- Wallet creation callback — creates both ARB and SOL wallets at once ---
+    if (data === "create_both_wallets" || data === "create_sol_wallet" || data === "create_arb_wallet") {
       bot.answerCallbackQuery(query.id);
       const chatId = query.message.chat.id;
       const msgId = query.message.message_id;
-      const network = data === "create_sol_wallet" ? "SOL" : "ARB";
       try {
-        const result = await creat_new_wallet({ telegramId: String(telegramId), network });
-        if (!result.status) {
-          return editMsgAny(chatId, msgId, `❌ ${result.message || "Could not create wallet."}`, {
+        const [arbResult, solResult] = await Promise.all([
+          creat_new_wallet({ telegramId: String(telegramId), network: "ARB" }),
+          creat_new_wallet({ telegramId: String(telegramId), network: "SOL" }),
+        ]);
+        if (!arbResult.status && !solResult.status) {
+          return editMsgAny(chatId, msgId, `❌ ${arbResult.message || "Could not create wallets."}`, {
             reply_markup: { inline_keyboard: [[{ text: "← Back", callback_data: "back_to_start" }]] },
           });
         }
-        const address = result.data?.address;
-        const networkLabel = network === "SOL" ? "Solana (SOL/USDC)" : "Arbitrum (ARB/USDC)";
+        const arbAddress = arbResult.data?.address || "N/A";
+        const solAddress = solResult.data?.address || "N/A";
         return editMsgAny(chatId, msgId,
-          `✅ *${networkLabel} Wallet Created*\n\n` +
-          `Your deposit address:\n\`${address}\`\n\n` +
-          `Send USDC or ${network} to this address to fund your account. ` +
-          `Your balance will be credited automatically within minutes.\n\n` +
-          `⚠️ Only send assets on the correct network to this address.`,
+          `✅ *Wallets Created*\n\n` +
+          `🔷 *Arbitrum (USDC/ETH)*\n\`${arbAddress}\`\n\n` +
+          `💎 *Solana (USDC/SOL)*\n\`${solAddress}\`\n\n` +
+          `Send USDC to the relevant address to fund your account. Your balance will be credited automatically within minutes.\n\n` +
+          `⚠️ Only send assets on the correct network to each address.`,
           {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [
-                  { text: "💰 View Wallet", callback_data: "wallet_deposit" },
-                  data === "create_sol_wallet"
-                    ? { text: "🔷 Add ARB Wallet", callback_data: "create_arb_wallet" }
-                    : { text: "💎 Add SOL Wallet", callback_data: "create_sol_wallet" },
-                ],
+                [{ text: "💰 View Wallet", callback_data: "wallet_deposit" }],
                 [{ text: "← Back to Main", callback_data: "back_to_start" }],
               ],
             },
@@ -2870,6 +2862,39 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
       } catch (err) {
         console.error("/referrals error:", err);
         bot.sendMessage(chatId, "❌ Could not load referral data.");
+      }
+    });
+
+    // --- /createwallet command — creates both ARB and SOL wallets ---
+    bot.onText(/\/createwallet/, async (msg) => {
+      const chatId = msg.chat.id;
+      const telegramId = msg.from.id;
+      if (msg.chat.type !== "private") {
+        return bot.sendMessage(chatId, "Please use /createwallet in a private chat with me.");
+      }
+      try {
+        const [arbResult, solResult] = await Promise.all([
+          creat_new_wallet({ telegramId: String(telegramId), network: "ARB" }),
+          creat_new_wallet({ telegramId: String(telegramId), network: "SOL" }),
+        ]);
+        const arbAddress = arbResult.data?.address || "N/A";
+        const solAddress = solResult.data?.address || "N/A";
+        bot.sendMessage(chatId,
+          `✅ *Wallets Ready*\n\n` +
+          `🔷 *Arbitrum (USDC/ETH)*\n\`${arbAddress}\`\n\n` +
+          `💎 *Solana (USDC/SOL)*\n\`${solAddress}\`\n\n` +
+          `Send USDC to the relevant address to fund your account.\n\n` +
+          `⚠️ Only send assets on the correct network to each address.`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [[{ text: "💰 View Wallet", callback_data: "wallet_deposit" }]],
+            },
+          }
+        );
+      } catch (err) {
+        console.error("/createwallet error:", err);
+        bot.sendMessage(chatId, "❌ Wallet creation failed. Please try again.");
       }
     });
 
