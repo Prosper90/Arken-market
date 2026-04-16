@@ -8,12 +8,15 @@ const axios = require('axios');
 
 const transporter = nodemailer.createTransport({
   secure: false,
-  port: process.env.EMAILPORT,
+  port: Number(process.env.EMAILPORT) || 587,
   host: process.env.EMAIL_HOST,
   auth: {
     user: process.env.FROM_EMAIL,
     pass: process.env.EMAIL_PASSWORD,
   },
+  connectionTimeout: 10000,  // 10s — fail fast if SMTP unreachable
+  greetingTimeout: 10000,
+  socketTimeout: 15000,
 });
 
 transporter.sendEMail = function (mailRequest) {

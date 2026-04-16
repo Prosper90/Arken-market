@@ -869,35 +869,39 @@ exports.closeMarketHandler = async (req, res) => {
 };
 
 exports.linkEmailHandler = async (req, res) => {
-  const result = await publishAndWait("markets_queue", {
-    ...req.body,
-    action: queuename.linkEmail,
-  });
-  res.json({ action: queuename.linkEmail, ...result });
+  try {
+    const result = await publishAndWait("markets_queue", { ...req.body, action: queuename.linkEmail });
+    res.json({ action: queuename.linkEmail, ...result });
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message || "Request timed out" });
+  }
 };
 
 exports.verifyEmailOtpHandler = async (req, res) => {
-  const result = await publishAndWait("markets_queue", {
-    ...req.body,
-    action: queuename.verifyEmailOtp,
-  });
-  res.json({ action: queuename.verifyEmailOtp, ...result });
+  try {
+    const result = await publishAndWait("markets_queue", { ...req.body, action: queuename.verifyEmailOtp });
+    res.json({ action: queuename.verifyEmailOtp, ...result });
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message || "Request timed out" });
+  }
 };
 
 exports.initiateAccountRecoveryHandler = async (req, res) => {
-  const result = await publishAndWait("markets_queue", {
-    ...req.body,
-    action: queuename.initiateAccountRecovery,
-  });
-  res.json({ action: queuename.initiateAccountRecovery, ...result });
+  try {
+    const result = await publishAndWait("markets_queue", { ...req.body, action: queuename.initiateAccountRecovery });
+    res.json({ action: queuename.initiateAccountRecovery, ...result });
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message || "Request timed out" });
+  }
 };
 
 exports.confirmAccountRecoveryHandler = async (req, res) => {
-  const result = await publishAndWait("markets_queue", {
-    ...req.body,
-    action: queuename.confirmAccountRecovery,
-  });
-  res.json({ action: queuename.confirmAccountRecovery, ...result });
+  try {
+    const result = await publishAndWait("markets_queue", { ...req.body, action: queuename.confirmAccountRecovery });
+    res.json({ action: queuename.confirmAccountRecovery, ...result });
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message || "Request timed out" });
+  }
 };
 
 exports.submitUMAAssertionHandler = async (req, res) => {

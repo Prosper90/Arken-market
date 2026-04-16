@@ -596,6 +596,14 @@ channel.ack(msg);
       channel.ack(msg);
     } catch (err) {
       console.error("Markets consumer error:", err);
+      // Always reply so auth-service doesn't hang waiting for RPC response
+      if (msg.properties.replyTo) {
+        channel.sendToQueue(
+          msg.properties.replyTo,
+          Buffer.from(JSON.stringify({ status: false, message: err.message || "Internal error" })),
+          { correlationId: msg.properties.correlationId }
+        );
+      }
       channel.ack(msg);
     }
   });
