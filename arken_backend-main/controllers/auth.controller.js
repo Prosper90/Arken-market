@@ -868,6 +868,38 @@ exports.closeMarketHandler = async (req, res) => {
   });
 };
 
+exports.linkEmailHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.linkEmail,
+  });
+  res.json({ action: queuename.linkEmail, ...result });
+};
+
+exports.verifyEmailOtpHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.verifyEmailOtp,
+  });
+  res.json({ action: queuename.verifyEmailOtp, ...result });
+};
+
+exports.initiateAccountRecoveryHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.initiateAccountRecovery,
+  });
+  res.json({ action: queuename.initiateAccountRecovery, ...result });
+};
+
+exports.confirmAccountRecoveryHandler = async (req, res) => {
+  const result = await publishAndWait("markets_queue", {
+    ...req.body,
+    action: queuename.confirmAccountRecovery,
+  });
+  res.json({ action: queuename.confirmAccountRecovery, ...result });
+};
+
 exports.submitUMAAssertionHandler = async (req, res) => {
   // 120s — on-chain assertTruth tx can take 30-90s on Sepolia
   const result = await publishAndWait("markets_queue", {

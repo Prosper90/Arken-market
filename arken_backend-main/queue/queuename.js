@@ -82,6 +82,10 @@ userBalance:"userBalance",
   addMarketLiquidity: "addMarketLiquidity",
   sweepUserDeposits: "sweepUserDeposits",
   sellPosition: "sellPosition",
+  linkEmail: "linkEmail",
+  verifyEmailOtp: "verifyEmailOtp",
+  initiateAccountRecovery: "initiateAccountRecovery",
+  confirmAccountRecovery: "confirmAccountRecovery",
 };
 
 module.exports = queueNamelist;
