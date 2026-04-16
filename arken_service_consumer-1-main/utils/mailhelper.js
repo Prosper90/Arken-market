@@ -1,91 +1,30 @@
-const nodemailer = require("nodemailer");
-const sgTransport = require("nodemailer-sendgrid-transport");
-const common = require("./common");
-const key = require("../config/key");
-const api_key = key.sendgrid_api;
-const from_mail = process.env.FROM_EMAIL;
 const axios = require('axios');
 
-const transporter = nodemailer.createTransport({
-  secure: false,
-  port: Number(process.env.EMAILPORT) || 587,
-  host: process.env.EMAIL_HOST,
-  auth: {
-    user: process.env.FROM_EMAIL,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-  connectionTimeout: 10000,  // 10s — fail fast if SMTP unreachable
-  greetingTimeout: 10000,
-  socketTimeout: 15000,
-});
-
-transporter.sendEMail = function (mailRequest) {
-  return new Promise(function (resolve, reject) {
-    transporter.sendMail(mailRequest, (error, info) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve("The message was sent!");
-      }
-    });
-  });
-};
-
-
-const sendSmsOtp = async () => {
-  const apiKey = process.env.SENDINBLUE_API_KEY; // Set in .env
-  const senderName = 'JD';
-  const message = `Your OTP is: ${1234}`;
-  const mobileNumber = 7010889149
-  const data = {
-    sender: senderName,
-    recipient: mobileNumber,
-    content: message,
-    type: 'transactional'
-  };
-
-  try {
-    const response = await axios.post('https://api.brevo.com/v3/transactionalSMS/sms', data, {
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    console.log('SMS sent successfully:', response.data);
-  } catch (error) {
-    console.error('Error sending SMS:', error.response ? error.response.data : error.message);
-  }
-};
-
-
-// Main function to send an email
+// Send email via Resend HTTP API (port 443 — no SMTP port issues)
 const sendMail = async (options) => {
-  // console.log(options,"dadsfasdfasdfasdfasdfas")
   try {
-    const mailOptions = {
-      from: { name: process.env.FROM_NAME, address: process.env.FROM_EMAIL }, // Sender address
-      to: options.to, // List of recipients
-      subject: options.subject, // Subject line
-      html: options.html // HTML body
-    };
-
-    // Send email using the transporter
-    const result = await transporter.sendMail(mailOptions);
-    //console.log("Email sent: ", result);
-    return result;
+    const response = await axios.post(
+      'https://api.resend.com/emails',
+      {
+        from: `${process.env.FROM_NAME || 'Arken'} <${process.env.FROM_EMAIL}>`,
+        to: Array.isArray(options.to) ? options.to : [options.to],
+        subject: options.subject,
+        html: options.html,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.EMAIL_PASSWORD}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    );
+    return response.data;
   } catch (error) {
-    console.error("Error sending email: ", error);
-    throw error;
+    console.error("Error sending email: ", error?.response?.data || error.message);
+    throw new Error(error?.response?.data?.message || error.message);
   }
 };
 
 
-
-
-
-module.exports = {
-  sendMail,
-  sendSmsOtp,
-  transporter
-};
+module.exports = { sendMail };
