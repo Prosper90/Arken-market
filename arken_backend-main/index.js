@@ -45,6 +45,13 @@ app.get("/health", (req, res) => {
 
 app.use("/", authRoutes);
 
+// Global error handler — catches unhandled controller errors (e.g. RPC timeout)
+// and returns JSON instead of Express's default HTML 500 page
+app.use((err, req, res, next) => {
+  console.error("Unhandled route error:", err.message);
+  res.status(500).json({ status: false, message: err.message || "Internal server error" });
+});
+
 const PORT = process.env.PORT || 4000;
 
 if (process.env.USE_SSL === "true") {

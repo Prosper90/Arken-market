@@ -80,7 +80,7 @@ channel.ack(msg);
     try {
       const data = JSON.parse(msg.content.toString());
       let result = null;
-         if (data.action === queuename.telegramwebapp) {
+      if (data.action === queuename.telegramwebapp) {
         result = await verifyTelegramWebAppHandler(data);
       }
       else if (data.action === queuename.verifyWallet) {
@@ -90,29 +90,33 @@ channel.ack(msg);
         result = await userbetplaceHandler(data);
       }
 
-     if (!data.action) {
-  console.error("❌ Consumer error: missing action in message:", data);
-}
+      if (!data.action) {
+        console.error("❌ Consumer error: missing action in message:", data);
+      }
 
-// validate result
-if (!result || typeof result !== "object") {
-  result = {
-    status: false,
-    message: "Invalid handler output",
-    action: data.action || "UNKNOWN_ACTION"
-  };
-}
+      if (!result || typeof result !== "object") {
+        result = {
+          status: false,
+          message: "Invalid handler output",
+          action: data.action || "UNKNOWN_ACTION"
+        };
+      }
 
-// send response
-channel.sendToQueue(
-  msg.properties.replyTo,
-  Buffer.from(JSON.stringify(result)),
-  { correlationId: msg.properties.correlationId }
-);
-
-channel.ack(msg);
+      channel.sendToQueue(
+        msg.properties.replyTo,
+        Buffer.from(JSON.stringify(result)),
+        { correlationId: msg.properties.correlationId }
+      );
+      channel.ack(msg);
     } catch (err) {
-      // console.error(' Consumer error:', err);
+      console.error("Bot consumer error:", err);
+      if (msg.properties.replyTo) {
+        channel.sendToQueue(
+          msg.properties.replyTo,
+          Buffer.from(JSON.stringify({ status: false, message: err.message || "Internal error" })),
+          { correlationId: msg.properties.correlationId }
+        );
+      }
       channel.ack(msg);
     }
   });

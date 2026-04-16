@@ -378,14 +378,15 @@ exports.getMergedMarketsHandler = async (req, res) => {
   });
 };
 exports.verifyTelegramWebAppHandler = async (req, res) => {
-  const result = await publishAndWait("bot_queue", {
-    ...req.body,
-    action: queuename.telegramwebapp,
-  });
-  res.json({
-    action: queuename.telegramwebapp,
-    ...result,
-  });
+  try {
+    const result = await publishAndWait("bot_queue", {
+      ...req.body,
+      action: queuename.telegramwebapp,
+    });
+    res.json({ action: queuename.telegramwebapp, ...result });
+  } catch (err) {
+    res.status(500).json({ status: false, message: err.message || "Request timed out" });
+  }
 };
 exports.verifyWalletAppHandler = async (req, res) => {
   const result = await publishAndWait("bot_queue", {
