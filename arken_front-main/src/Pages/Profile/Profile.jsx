@@ -508,15 +508,23 @@ const Profile = () => {
 
               {userProfile?.email && userProfile?.emailVerified ? (
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
-                    <span style={{ fontWeight: 600, fontSize: 14, color: C.green }}>Email Linked</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+                      <span style={{ fontWeight: 600, fontSize: 14, color: C.green }}>Email Linked</span>
+                    </div>
+                    <button
+                      onClick={() => { setEmailStep('input'); setEmailInput(userProfile.email || ''); setEmailOtpInput(''); }}
+                      style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 8, padding: '4px 10px', fontSize: 12, color: C.muted, cursor: 'pointer' }}
+                    >
+                      Change
+                    </button>
                   </div>
                   <div style={{ background: C.surface, borderRadius: 10, padding: '10px 14px', fontSize: 13, color: C.sub, fontFamily: 'monospace', border: `1px solid ${C.border}` }}>
                     {userProfile.email}
                   </div>
                   <div style={{ marginTop: 10, fontSize: 12, color: C.muted, lineHeight: 1.6 }}>
-                    Your email is linked. You can use it to recover your account if you lose access.
+                    Used for account recovery if you lose access to Telegram.
                   </div>
                 </div>
               ) : emailStep === 'input' ? (
