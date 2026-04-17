@@ -224,8 +224,7 @@
 
 
 const cron = require("node-cron");
-const Polymarket = require("./models/polymarket");
-const API_URL = process.env.POLYMARKET_URL;
+// Polymarket sync removed — Arken no longer integrates with Polymarket.
 
 const CRYPTO_MAP = {
   BTC: ["bitcoin", "btc", "satoshi", "btc price", "bitcoin price"],
@@ -856,12 +855,14 @@ else if (isEconomy(item)) {
   }
 }
 
-cron.schedule("*/60 * * * *", async () => {
-  // cron.schedule("*/5 * * * * *", async () => {
+// Polymarket sync cron removed — Arken no longer integrates with Polymarket.
+// cron.schedule("*/60 * * * *", async () => {
+if (false) (async () => {
   console.log("Fetching Polymarket…", new Date().toLocaleString());
 
+  const API_URL = null; // removed
+  const Polymarket = null; // removed
   if (!API_URL) {
-    console.error("❌ POLYMARKET_URL env var is not set — skipping Polymarket sync. Set POLYMARKET_URL=https://gamma-api.polymarket.com in your .env file.");
     return;
   }
 
@@ -957,7 +958,7 @@ cron.schedule("*/60 * * * *", async () => {
   } catch (e) {
     console.error("Cron error:", e);
   }
-});
+})();
 
 
 // ─── UMA Oracle Resolution Cron ──────────────────────────────────────────────

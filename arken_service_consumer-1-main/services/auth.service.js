@@ -5,7 +5,6 @@ var adminDB = require("../models/admin");
 var adminloginhistoryDB = require("../models/adminloginhistory");
 var mailtempDB = require("../models/mailtemplate");
 var antiPhishing = require("../models/antiphising");
-var polymarketDB = require("../models/polymarket");
 var UserWallet = require("../models/userWallet");
 var Prediction = require("../models/predictions");
 var currencyDB = require("../models/currency");
@@ -41,7 +40,6 @@ const markets = require("../models/markets");
 const web3 = require("@solana/web3.js");
 const jwt_secret = key.JWT_TOKEN_SECRET;
 const OTP = require("../models/otp");
-const API_URL = process.env.POLYMARKET_URL;
 const TelegramBot = require('node-telegram-bot-api');
 
 const {
@@ -1615,11 +1613,6 @@ async function getMergedMarketsHandler(data) {
       { $set: { active: false, marketStatus: 'closed' } }
     );
 
-    await polymarketDB.updateMany(
-      { endDate: { $lt: new Date() }, active: true },
-      { $set: { active: false } }
-    );
-
     let taggedManualMarkets = [];
 
     if (!polyOnly) {
@@ -1654,75 +1647,7 @@ async function getMergedMarketsHandler(data) {
       }));
     }
 
-    const manualCount = taggedManualMarkets.length;
-    const remaining = limit - manualCount;
-
-    let polymarkets = [];
-
-    if ((!manualOnly || polyOnly) && remaining > 0) {
-      const polyQuery = {
-        active: true,
-        closed: false,
-        endDate: { $gte: new Date() },
-        ...cursorQuery,
-        ...(polyOnly ? {} : categoryQuery),
-        ...subcategoryQuery,
-        ...newQuery,
-        ...searchQuery,
-      };
-
-      if (timeFilter) {
-        polyQuery.startDate = { $gte: timeFilter };
-      }
-
-      polymarkets = await polymarketDB
-        .find(polyQuery)
-        .sort(sortQuery)
-        .limit(remaining)
-        .lean();
-    }
-
-    const polymarketWithChance = polymarkets.map((item) => {
-      let outcomes = item.outcomes;
-      if (Array.isArray(outcomes) && typeof outcomes[0] === "string") {
-        try { outcomes = JSON.parse(outcomes[0]); } catch {}
-      }
-
-      let outcomePrices = item.outcomePrices;
-      if (Array.isArray(outcomePrices) && typeof outcomePrices[0] === "string") {
-        try { outcomePrices = JSON.parse(outcomePrices[0]); } catch {}
-      }
-
-      let chancePercents = null;
-
-      if (Array.isArray(outcomePrices) && outcomePrices.length >= 2) {
-        chancePercents = outcomePrices.map((p) =>
-          Number((Number(p) * 100).toFixed(2))
-        );
-      } else if (
-        typeof item.yesPool === "number" &&
-        typeof item.noPool === "number" &&
-        item.yesPool + item.noPool > 0
-      ) {
-        const total = item.yesPool + item.noPool;
-        chancePercents = [
-          Number(((item.yesPool / total) * 100).toFixed(2)),
-          Number(((item.noPool / total) * 100).toFixed(2)),
-        ];
-      } else {
-        chancePercents = [50, 50];
-      }
-
-      return {
-        ...item,
-        outcomes,
-        outcomePrices,
-        chancePercents,
-        source: "poly",
-      };
-    });
-
-    const mergedTemp = [...taggedManualMarkets, ...polymarketWithChance];
+    const mergedTemp = [...taggedManualMarkets];
 
     const nonOtherMarkets = mergedTemp.filter(
       (item) => item.category !== "Other"
@@ -1819,11 +1744,6 @@ async function getMergedMarketByIdHandler(data) {
       { $set: { active: false, marketStatus: 'closed' } },
     );
 
-    await polymarketDB.updateMany(
-      { endDate: { $lt: new Date() }, active: true },
-      { $set: { active: false } },
-    );
-
     let market = await Market.findOne({
       _id: objectId,
       marketStatus: { $ne: 'pending' },
@@ -1881,89 +1801,7 @@ async function getMergedMarketByIdHandler(data) {
       };
     }
 
-    market = await polymarketDB
-      .findOne({
-        _id: objectId,
-        active: true,
-        closed: false,
-        endDate: { $gte: new Date() },
-      })
-      .lean();
-
-    if (!market) {
-      return { success: false, message: "Market not found" };
-    }
-
-    let outcomes = market.outcomes;
-    if (Array.isArray(outcomes) && typeof outcomes[0] === "string") {
-      try {
-        outcomes = JSON.parse(outcomes[0]);
-      } catch {}
-    }
-
-    let outcomePrices = market.outcomePrices;
-    if (Array.isArray(outcomePrices) && typeof outcomePrices[0] === "string") {
-      try {
-        outcomePrices = JSON.parse(outcomePrices[0]);
-      } catch {}
-    }
-
-    let chancePercents;
-    if (Array.isArray(outcomePrices) && outcomePrices.length >= 2) {
-      chancePercents = outcomePrices.map((p) =>
-        Number((Number(p) * 100).toFixed(2)),
-      );
-    } else if (
-      typeof market.yesPool === "number" &&
-      typeof market.noPool === "number" &&
-      market.yesPool + market.noPool > 0
-    ) {
-      const total = market.yesPool + market.noPool;
-      chancePercents = [
-        Number(((market.yesPool / total) * 100).toFixed(2)),
-        Number(((market.noPool / total) * 100).toFixed(2)),
-      ];
-    } else {
-      chancePercents = [50, 50];
-    }
-
-    const polyData = {
-      _id: market._id,
-      question: market.question,
-      description: market.description,
-      tags: market.tags,
-      image: market.image,
-      startDate: market.startDate,
-      conditionId: market.conditionId,
-      endDate: market.endDate,
-      liquidity: market.liquidity,
-      outcomeTokenIds: market.outcomeTokenIds,
-      minimumLiquidity: market.minimumLiquidity,
-      estimatedNetworkFee: market.estimatedNetworkFee,
-      totalLiquidity: market.totalLiquidity,
-      totalDeduction: market.totalDeduction,
-      outcomes,
-      outcomePrices,
-      chancePercents,
-      bestBid: market.bestBid,
-      bestAsk: market.bestAsk,
-      resolution: market.resolution,
-      currency: market.currency,
-      active: market.active,
-      category: market.category,
-      closed: market.closed,
-      archived: market.archived,
-      slug: market.slug,
-      specifyId: market.specifyId,
-      acceptingOrders: market.acceptingOrders,
-      events: market.events,
-      source: "poly",
-      createdAt: market.createdAt,
-    };
-    return {
-      success: true,
-      data: { ...polyData, ...normalizeMarketForUI(polyData) },
-    };
+    return { success: false, message: "Market not found" };
   } catch (error) {
     console.error("Error fetching merged market by id:", error);
     return { success: false, data: null, error: error.message };
@@ -2768,25 +2606,6 @@ async function userbetplaceHandler(data) {
     let currentPrice = odds;
     let marketQuestion = null;
 
-    if (source === "poly" && marketId) {
-      const market = await polymarketDB.findOne({ specifyId: marketId });
-
-      if (market) {
-        marketQuestion = market.question;
-
-        if (market.outcomeTokenIds instanceof Map) {
-          tokenId = market.outcomeTokenIds.get(outcomeLabel) || null;
-        }
-
-        if (
-          Array.isArray(market.outcomePrices) &&
-          market.outcomePrices[outcomeIndex] !== undefined
-        ) {
-          avgPrice = parseFloat(market.outcomePrices[outcomeIndex]) || odds;
-          currentPrice = avgPrice;
-        }
-      }
-    }
 
     const prediction = await Prediction.create({
       userId: user._id,
@@ -2970,23 +2789,9 @@ async function getActiveBetsForUserHandler(data) {
       };
     }
 
-    const polyMarketIds = activeBets
-      .filter((b) => b.source === "poly" && b.marketId)
-      .map((b) => b.marketId);
-
     const manualMarketIds = activeBets
-      .filter((b) => b.source === "manual" && b.manualId)
+      .filter((b) => b.manualId)
       .map((b) => b.manualId);
-
-    const polyMarkets = await polymarketDB
-      .find({ specifyId: { $in: polyMarketIds } })
-      .select("specifyId question")
-      .lean();
-
-    const polyMarketMap = {};
-    polyMarkets.forEach((m) => {
-      polyMarketMap[m.specifyId] = m.question;
-    });
 
     const manualMarkets = await markets
       .find({ _id: { $in: manualMarketIds } })
@@ -3001,10 +2806,7 @@ async function getActiveBetsForUserHandler(data) {
     const finalData = activeBets.map((bet) => ({
       ...bet,
       type: "bet",
-      question:
-        bet.source === "poly"
-          ? bet.question || polyMarketMap[bet.marketId] || ""
-          : manualMarketMap[bet.manualId?.toString()] || "",
+      question: bet.question || manualMarketMap[bet.manualId?.toString()] || "",
     }));
 
     // Fetch LP positions for this user
@@ -3076,22 +2878,8 @@ async function getCompletedBetsForUserHandler(data) {
       };
     }
 
-    const polyMarketIds = completedBets
-      .filter((b) => b.source === "poly" && b.marketId)
-      .map((b) => b.marketId);
-
-    const polyMarkets = await polymarketDB
-      .find({ specifyId: { $in: polyMarketIds } })
-      .select("specifyId question")
-      .lean();
-
-    const polyMarketMap = {};
-    polyMarkets.forEach((m) => {
-      polyMarketMap[m.specifyId] = m.question;
-    });
-
     const manualMarketIds = completedBets
-      .filter((b) => b.source === "manual" && b.manualId)
+      .filter((b) => b.manualId)
       .map((b) => b.manualId);
 
     const manualMarkets = await markets
@@ -3106,10 +2894,7 @@ async function getCompletedBetsForUserHandler(data) {
 
     const finalData = completedBets.map((bet) => ({
       ...bet,
-      question:
-        bet.source === "poly"
-          ? bet.question || polyMarketMap[bet.marketId] || ""
-          : manualMarketMap[bet.manualId?.toString()] || "",
+      question: bet.question || manualMarketMap[bet.manualId?.toString()] || "",
     }));
 
     return {
@@ -3697,14 +3482,21 @@ async function userWithdrawHandler(data) {
       return { success: false, Message: `Insufficient balance. You have $${availableBalance.toFixed(2)}` };
     }
 
-    // 4. Build admin keypairs from env (no DB needed)
+    // 4. Load user's custodial wallets
+    const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+    const userSolWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase() === 'SOL');
+    const userArbWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase().includes('ARB'));
+
+    if (currency === 'USDC' && !userSolWallet) return { success: false, Message: "No SOL custodial wallet found" };
+    if (currency === 'ARB'  && !userArbWallet) return { success: false, Message: "No ARB custodial wallet found" };
+
+    // Admin keypairs — used only as fee payer for Solana gas, and ETH gas top-up for EVM
     const _solAdminKeypair = () => {
       if (!process.env.SOLFLARE_PRIVATE_KEY) throw new Error("SOLFLARE_PRIVATE_KEY not set");
       return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.SOLFLARE_PRIVATE_KEY)));
     };
-    const _evmAdminWallet = () => {
+    const _evmAdminWallet = (provider) => {
       if (!process.env.EVM_PRIVATE_KEY) throw new Error("EVM_PRIVATE_KEY not set");
-      const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
       return new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider);
     };
 
@@ -3725,53 +3517,73 @@ async function userWithdrawHandler(data) {
       txn_id: "",
     });
 
-    // 7. Send from admin wallet
+    // 7. Send from user's custodial wallet
     try {
       let txHash;
 
       if (currency === "SOL") {
+        // Native SOL — sent from user's custodial SOL wallet
+        // Admin is fee payer so user does not need SOL for gas
         const adminKeypair = _solAdminKeypair();
         const connection = await createConnection();
+        const userSolPk = await common.decrypt(userSolWallet.privateKey);
+        const userKeypair = Keypair.fromSecretKey(bs58.decode(userSolPk));
         const toPublicKey = new PublicKey(Address);
         const lamports = Math.floor(cryptoAmount * LAMPORTS_PER_SOL);
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: adminKeypair.publicKey,
-            toPubkey: toPublicKey,
-            lamports,
-          })
+        const tx = new Transaction().add(
+          SystemProgram.transfer({ fromPubkey: userKeypair.publicKey, toPubkey: toPublicKey, lamports })
         );
-        const sig = await sendAndConfirmTransaction(connection, transaction, [adminKeypair]);
+        tx.feePayer = adminKeypair.publicKey;
+        const sig = await sendAndConfirmTransaction(connection, tx, [adminKeypair, userKeypair]);
         txHash = sig;
 
       } else if (currency === "USDC") {
-        // USDC SPL token on Solana — admin sends directly
+        // USDC SPL — sent from user's own ATA
+        // Admin is fee payer so user does not need SOL for gas
         const adminKeypair = _solAdminKeypair();
         const connection = await createConnection();
+        const userSolPk = await common.decrypt(userSolWallet.privateKey);
+        const userKeypair = Keypair.fromSecretKey(bs58.decode(userSolPk));
         const TOKEN_MINT = new PublicKey(process.env.USDT_MINT);
         const toPublicKey = new PublicKey(Address);
-        const adminATA = await getAssociatedTokenAddress(TOKEN_MINT, adminKeypair.publicKey);
+        const userATA = await getAssociatedTokenAddress(TOKEN_MINT, userKeypair.publicKey);
         const receiverATA = await getAssociatedTokenAddress(TOKEN_MINT, toPublicKey);
         const tx = new Transaction();
+        tx.feePayer = adminKeypair.publicKey;
         if (!(await connection.getAccountInfo(receiverATA))) {
-          tx.add(
-            createAssociatedTokenAccountInstruction(
-              adminKeypair.publicKey, receiverATA, toPublicKey, TOKEN_MINT
-            )
-          );
+          tx.add(createAssociatedTokenAccountInstruction(
+            adminKeypair.publicKey, receiverATA, toPublicKey, TOKEN_MINT
+          ));
         }
         const amountRaw = Math.floor(cryptoAmount * 1_000_000); // 6 decimals
-        tx.add(
-          createTransferInstruction(adminATA, receiverATA, adminKeypair.publicKey, amountRaw)
-        );
-        const sig = await sendAndConfirmTransaction(connection, tx, [adminKeypair]);
+        tx.add(createTransferInstruction(userATA, receiverATA, userKeypair.publicKey, amountRaw));
+        // Both admin (fee payer) and user (token authority) must sign
+        const sig = await sendAndConfirmTransaction(connection, tx, [adminKeypair, userKeypair]);
         txHash = sig;
 
       } else if (currency === "ARB") {
-        // ARB USDC (ERC-20) — admin wallet sends directly
-        const adminEthWallet = _evmAdminWallet();
-        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, adminEthWallet);
+        // USDC ERC-20 — sent from user's custodial ARB wallet
+        // Admin tops up ETH gas if user's wallet balance is too low
+        const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
+        const userArbPk = await common.decrypt(userArbWallet.privateKey);
+        const userEthWallet = new ethers.Wallet(userArbPk, provider);
         const amountParsed = ethers.parseUnits(cryptoAmount.toFixed(6), 6);
+
+        // Estimate gas needed for the USDC transfer
+        const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, userEthWallet);
+        const gasPrice = (await provider.getFeeData()).gasPrice;
+        const gasEstimate = await usdc.transfer.estimateGas(cleanAddress(Address), amountParsed);
+        const gasCost = gasPrice * gasEstimate;
+
+        const ethBalance = await provider.getBalance(userEthWallet.address);
+        if (ethBalance < gasCost) {
+          // Top up with enough ETH to cover gas + a small buffer
+          const topUp = gasCost * 2n;
+          const adminEthWallet = _evmAdminWallet(provider);
+          const fundTx = await adminEthWallet.sendTransaction({ to: userEthWallet.address, value: topUp });
+          await fundTx.wait();
+        }
+
         const tx = await usdc.transfer(cleanAddress(Address), amountParsed);
         const receipt = await tx.wait();
         txHash = receipt.hash;

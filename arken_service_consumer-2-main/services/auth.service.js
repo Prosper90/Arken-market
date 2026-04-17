@@ -4,7 +4,6 @@ var adminloginhistoryDB = require("../models/adminloginhistory");
 const mongoose = require("mongoose");
 var mailtempDB = require("../models/mailtemplate");
 var antiPhishing = require("../models/antiphising");
-var polymarketDB = require("../models/polymarket");
 var TelegramGroup = require("../models/telegramGroup");
 var Prediction = require("../models/predictions");
 var AdminWallet = require("../models/adminWallet");
@@ -26,7 +25,6 @@ const key = require("../config/key");
 const depositList = require("../models/depositList");
 const currencyDB = require("../models/currency")
 const jwt_secret = key.JWT_TOKEN_SECRET;
-const API_URL = process.env.POLYMARKET_URL;
 const userWalletDB = require("../models/userWallet");
 const moment = require("moment");
 const markets = require("../models/markets");
@@ -3048,4 +3046,4 @@ async function getPlatformFeeSettingsHandler() {
 
 
 
-module.exports = {createMarketHandler,getPlatformFeeSettingsHandler,createPlatformfeeHandler,manualSettlePredictionHandler,exitPredictionHandler,getUserManagementListHandler,getAdminDashboardHandler,getPolymarketListHandler,deletePolyMarketHandler,deletePolyMarketHandler,getAllPolyMarketsHandler,getPolyMarketHandler,getPolyMarketsDetailHandler,createPolyMarketHandler,getPolyEventsDetailHandler,getPolyEventsDetailsHandler,getMarketHandler,deleteMarketHandler,updateMarketHandler,loginUser,forgotemailHandler,getAllMarketsHandler,getCombinedAllMarketsHandler,forgototpverifyHandler,resendemailotpHandler,forgotpasswordHandler,getAdminHandler,getDepositList,getWithdrawlist,verifyTokenHandler,adminloggHandler,dashboardcountsHandler,getAllEventsHandler,getEventHandler,UpdateEventHandler,deleteEventHandler,createEventHandler,currencyAddUpdate,currencyDelete, allCurrencyList,viewOneCurrency,getPredictionManagementListHandler};
+module.exports = {createMarketHandler,getPlatformFeeSettingsHandler,createPlatformfeeHandler,manualSettlePredictionHandler,exitPredictionHandler,getUserManagementListHandler,getAdminDashboardHandler,getMarketHandler,deleteMarketHandler,updateMarketHandler,loginUser,forgotemailHandler,getAllMarketsHandler,getCombinedAllMarketsHandler,forgototpverifyHandler,resendemailotpHandler,forgotpasswordHandler,getAdminHandler,getDepositList,getWithdrawlist,verifyTokenHandler,adminloggHandler,dashboardcountsHandler,getAllEventsHandler,getEventHandler,UpdateEventHandler,deleteEventHandler,createEventHandler,currencyAddUpdate,currencyDelete, allCurrencyList,viewOneCurrency,getPredictionManagementListHandler};

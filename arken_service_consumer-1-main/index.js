@@ -8,7 +8,6 @@ const { startAuthConsumer, setDepositSuccessCallback } = require('./consumers/au
 const key = require("./config/key");
 const User = require("./models/users");
 const Market = require("./models/markets");
-const PolyMarket = require("./models/polymarket");
 const connectDB = require("./config/db");
 const TelegramBot = require("node-telegram-bot-api");
 require('./cronresolution');
@@ -1186,18 +1185,16 @@ bot.on("callback_query", async (query) => {
       const page = parseInt(data.split("_")[2]);
       const skip = (page - 1) * PAGE_SIZE;
 
-      const totalCount = await PolyMarket.countDocuments({
+      const totalCount = await Market.countDocuments({
         active: true,
-        closed: false,
         endDate: { $gte: new Date() },
       });
 
-      const trendingMarkets = await PolyMarket.find({
+      const trendingMarkets = await Market.find({
         active: true,
-        closed: false,
         endDate: { $gte: new Date() },
       })
-        .sort({ liquidity: -1, volume24hr: -1 })
+        .sort({ totalVolume: -1 })
         .skip(skip)
         .limit(PAGE_SIZE)
         .lean();
@@ -1305,39 +1302,21 @@ if (data.startsWith("search_page_")) {
     endDate: { $gte: new Date() }
   };
 
-  const polyQuery = {
-    active: true,
-    closed: false,
-    endDate: { $gte: new Date() }
-  };
-
-
   if (categoryFilter) {
     manualQuery.category = categoryFilter;
-    polyQuery.category = categoryFilter;
   }
 
-
   if (regex) {
-
     manualQuery.$or = [
       { question: regex },
       { description: regex },
       { subcategory: regex }
     ];
-
-    polyQuery.$or = [
-      { question: regex },
-      { subcategory: regex }
-    ];
   }
 
-
-
   const manualAll = await Market.find(manualQuery).lean();
-  const polyAll = await PolyMarket.find(polyQuery).lean();
 
-  const mergedAll = [...manualAll, ...polyAll];
+  const mergedAll = [...manualAll];
 
   const totalCount = mergedAll.length;
   const totalPages = Math.ceil(totalCount / SEARCH_PAGE_SIZE);
@@ -1452,7 +1431,7 @@ if (data.startsWith("search_page_")) {
       const regexPattern = keywords.join("|");
       const regex = new RegExp(regexPattern, "i");
 
-      const manualCount = await Market.countDocuments({
+      const totalCount = await Market.countDocuments({
         active: true,
         category,
         endDate: { $gte: new Date() },
@@ -1463,21 +1442,9 @@ if (data.startsWith("search_page_")) {
         ]
       });
 
-      const polyCount = await PolyMarket.countDocuments({
-        active: true,
-        closed: false,
-        category,
-        endDate: { $gte: new Date() },
-        $or: [
-          { question: regex },
-          { subcategory: regex }
-        ]
-      });
-
-      const totalCount = manualCount + polyCount;
       const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-      const manual = await Market.find({
+      const results = await Market.find({
         active: true,
         category,
         endDate: { $gte: new Date() },
@@ -1487,19 +1454,6 @@ if (data.startsWith("search_page_")) {
           { subcategory: regex }
         ]
       }).skip(skip).limit(PAGE_SIZE).lean();
-
-      const poly = await PolyMarket.find({
-        active: true,
-        closed: false,
-        category,
-        endDate: { $gte: new Date() },
-        $or: [
-          { question: regex },
-          { subcategory: regex }
-        ]
-      }).skip(skip).limit(PAGE_SIZE).lean();
-
-      const results = [...manual, ...poly].slice(0, PAGE_SIZE);
 
       if (!results.length) {
         bot.answerCallbackQuery(query.id);
@@ -1595,40 +1549,19 @@ if (data.startsWith("search_page_")) {
       if (categoryKey === "bets_others") filter.category = "Other";
 
 
-      const manualCount = await Market.countDocuments({
+      const totalCount = await Market.countDocuments({
         active: true,
         endDate: { $gte: new Date() },
         ...filter
       });
-
-      const polyCount = await PolyMarket.countDocuments({
-        active: true,
-        closed: false,
-        endDate: { $gte: new Date() },
-        ...filter
-      });
-
-      const totalCount = manualCount + polyCount;
 
       const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-
-      const manual = await Market.find({
+      const merged = await Market.find({
         active: true,
         endDate: { $gte: new Date() },
         ...filter
       }).skip(skip).limit(PAGE_SIZE).lean();
-
-
-      const poly = await PolyMarket.find({
-        active: true,
-        closed: false,
-        endDate: { $gte: new Date() },
-        ...filter
-      }).skip(skip).limit(PAGE_SIZE).lean();
-
-
-      const merged = [...manual, ...poly].slice(0, PAGE_SIZE);
 
 
       if (!merged.length) {
@@ -2142,18 +2075,16 @@ if (data.startsWith("search_page_")) {
       }
     }
 
-    const totalCount = await PolyMarket.countDocuments({
+    const totalCount = await Market.countDocuments({
       active: true,
-      closed: false,
       endDate: { $gte: new Date() },
     });
 
-    const trendingMarkets = await PolyMarket.find({
+    const trendingMarkets = await Market.find({
       active: true,
-      closed: false,
       endDate: { $gte: new Date() },
     })
-      .sort({ liquidity: -1, volume24hr: -1 })
+      .sort({ totalVolume: -1 })
       .skip(skip)
       .limit(PAGE_SIZE)
       .lean();
@@ -2545,32 +2476,11 @@ bot.onText(/\/search (.+)/i, async (msg, match) => {
       ],
     };
 
-    const queryPoly = {
-      active: true,
-      closed: false,
-      endDate: { $gte: new Date() },
-      ...(matchedCategory && { category: matchedCategory }),
-      $or: [
-        { question: regex },
-        { category: regex },
-        { subcategory: regex },
-      ],
-    };
+    const totalCount = await Market.countDocuments(queryManual);
 
-    const totalManual = await Market.countDocuments(queryManual);
-    const totalPoly = await PolyMarket.countDocuments(queryPoly);
-
-    const totalCount = totalManual + totalPoly;
-
-    const manual = await Market.find(queryManual)
+    const results = await Market.find(queryManual)
       .limit(SEARCH_PAGE_SIZE)
       .lean();
-
-    const poly = await PolyMarket.find(queryPoly)
-      .limit(SEARCH_PAGE_SIZE)
-      .lean();
-
-    const results = [...manual, ...poly].slice(0, SEARCH_PAGE_SIZE);
 
     if (!results.length) {
 

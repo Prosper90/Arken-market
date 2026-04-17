@@ -1,5 +1,5 @@
 const { getChannel } = require('../rabbit');
-const { loginUser, forgotemailHandler,resendemailotpHandler,createPlatformfeeHandler,getPlatformFeeSettingsHandler,getUserManagementListHandler,getAdminDashboardHandler,getPolymarketListHandler,createPolyMarketHandler,getPolyMarketsDetailHandler,getAllPolyMarketsHandler,deletePolyMarketHandler,getPolyMarketHandler,getPolyEventsDetailHandler,getPolyEventsDetailsHandler,createMarketHandler,deleteMarketHandler,updateMarketHandler,getAllMarketsHandler,getMarketHandler,getCombinedAllMarketsHandler,forgototpverifyHandler,forgotpasswordHandler,getAdminHandler,getDepositList,getWithdrawlist,verifyTokenHandler,adminloggHandler,dashboardcountsHandler, getAllEventsHandler, getEventHandler,UpdateEventHandler,deleteEventHandler,createEventHandler,currencyAddUpdate,currencyDelete, allCurrencyList,viewOneCurrency,manualSettlePredictionHandler,getPredictionManagementListHandler, exitPredictionHandler} = require('../services/auth.service');
+const { loginUser, forgotemailHandler,resendemailotpHandler,createPlatformfeeHandler,getPlatformFeeSettingsHandler,getUserManagementListHandler,getAdminDashboardHandler,createMarketHandler,deleteMarketHandler,updateMarketHandler,getAllMarketsHandler,getMarketHandler,getCombinedAllMarketsHandler,forgototpverifyHandler,forgotpasswordHandler,getAdminHandler,getDepositList,getWithdrawlist,verifyTokenHandler,adminloggHandler,dashboardcountsHandler, getAllEventsHandler, getEventHandler,UpdateEventHandler,deleteEventHandler,createEventHandler,currencyAddUpdate,currencyDelete, allCurrencyList,viewOneCurrency,manualSettlePredictionHandler,getPredictionManagementListHandler, exitPredictionHandler} = require('../services/auth.service');
 const queuename = require("../queue/queuename");
 
 async function startAuthConsumer() {
@@ -83,27 +83,6 @@ async function startAuthConsumer() {
         result = await deleteMarketHandler(data);
       }
       
-      else if (data.action === queuename.getPolyEventsDetails) {
-        result = await getPolyEventsDetailsHandler(data);
-      }
-      else if (data.action === queuename.getPolyMarketsDetail) {
-        result = await getPolyMarketsDetailHandler(data);
-      }
-      else if (data.action === queuename.getPolyEventsDetail) {
-        result = await getPolyEventsDetailHandler(data);
-      }
-      else if (data.action === queuename.createPolyMarket) {
-        result = await createPolyMarketHandler(data);
-      }
-      else if (data.action === queuename.getPolyMarket) {
-        result = await getPolyMarketHandler(data);
-      }
-      else if (data.action === queuename.getAllPolyMarkets) {
-        result = await getAllPolyMarketsHandler(data);
-      }
-      else if (data.action === queuename.deletePolyMarket) {
-        result = await deletePolyMarketHandler(data);
-      }
 
      if (!data.action) {
   console.error("❌ Consumer error: missing action in message:", data);
@@ -135,18 +114,7 @@ channel.ack(msg);
     try {
       const data = JSON.parse(msg.content.toString());
       let result = null;
-       if (data.action === queuename.getPolymarketList) {
-        try {
-        result = await getPolymarketListHandler(data);
-    } catch (err) {
-        console.error("Polymarket Handler Error:", err);
-        result = { status: false, error: "Polymarket API failed", action: data.action };
-    }
-      }
-
-     
-
-        else if (data.action === queuename.getCombinedAllMarkets) {
+       if (data.action === queuename.getCombinedAllMarkets) {
         result = await getCombinedAllMarketsHandler(data);
       }
 
