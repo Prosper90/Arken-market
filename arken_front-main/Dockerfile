@@ -9,6 +9,11 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+# Bake production API/socket URLs so no .env file is needed on the server.
+# These are relative paths — nginx proxies /api/ and /socket.io/ internally.
+ENV VITE_API_HOST=/api/
+ENV VITE_SOCKET_URL=
+
 RUN npm run build
 
 # Stage 2: Serve with nginx

@@ -35,8 +35,8 @@ router.post("/resolution/getpredictionmanagementlist",common.tokenmiddleware, ge
 router.post("/resolution/manualSettlePrediction",common.tokenmiddleware, manualSettlePredictionHandler);
 router.post("/tele/commuupdate",common.tokenmiddleware, updateGroupCommissionHandler);
 router.post("/tele/commuget", common.tokenmiddleware, getTelegramGroupListHandler);
-router.post("/api/auth/telegram-webapp", verifyTelegramWebAppHandler);
-router.post("/api/auth/verify-wallet", verifyWalletAppHandler);
+router.post("/auth/telegram-webapp", verifyTelegramWebAppHandler);
+router.post("/auth/verify-wallet", verifyWalletAppHandler);
 router.post("/user/getmergedmarkets", getMergedMarketsHandler);
 router.post("/user/getMergedMarketById", getMergedMarketByIdHandler);
 router.get("/user/getHomeTodayNews", getHomeTodayNewsHandler);

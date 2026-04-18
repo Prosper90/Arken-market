@@ -1,7 +1,7 @@
 const service = {
   getmergedmarkets: "user/getmergedmarkets",
-  telegramWebappAuth: "api/auth/telegram-webapp",
-  verifyWallet: "api/auth/verify-wallet",
+  telegramWebappAuth: "auth/telegram-webapp",
+  verifyWallet: "auth/verify-wallet",
   userbetplace: "user/bet-place",
   activebets: "user/active-bets",
   getUserTotalWinnings: "user/getUserTotalWinnings",
