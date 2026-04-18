@@ -69,7 +69,13 @@ const Wallet = () => {
   const [userWallet, setUserWallet]       = useState({ isConnected: false, walletAddress: '', walletName: '', uniqueId: '' });
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [usdtBalance, setUsdtBalance]     = useState(0);
+  const [solBalance, setSolBalance]        = useState(0);
+  const [evmBalance, setEvmBalance]        = useState(0);
   const [copied, setCopied]               = useState('');
+
+  const [depositHistory, setDepositHistory]   = useState([]);
+  const [withdrawHistory, setWithdrawHistory] = useState([]);
+  const [historyLoading, setHistoryLoading]   = useState(false);
 
   // Deposit / withdraw inline state
   const [tab, setTab]                     = useState('deposit');
@@ -82,7 +88,26 @@ const Wallet = () => {
   useEffect(() => {
     getUserDetails();
     getBalance();
+    fetchHistory();
   }, []);
+
+  const fetchHistory = async () => {
+    const tid = telegramUser?.telegramId || localStorage.getItem('telegramId');
+    if (!tid) return;
+    setHistoryLoading(true);
+    try {
+      const [depResp, wdResp] = await Promise.all([
+        postMethod({ apiUrl: apiService.get_deposit_list, payload: { telegramId: tid } }),
+        postMethod({ apiUrl: apiService.get_withdraw_list, payload: { telegramId: tid } }),
+      ]);
+      if (depResp?.success) setDepositHistory(depResp.data || []);
+      if (wdResp?.success)  setWithdrawHistory(wdResp.data  || []);
+    } catch (e) {
+      console.error('fetchHistory error:', e);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const copy = (text, key = 'main') => {
     navigator.clipboard.writeText(text);
@@ -137,7 +162,11 @@ const Wallet = () => {
       if (!telegramUserID) return;
       setLoadingBalance(true);
       const resp = await postMethod({ apiUrl: apiService.get_user_balance, payload: { telegramId: telegramUserID } });
-      if (resp.success) setUsdtBalance(resp.totalUsdt);
+      if (resp.success) {
+        setUsdtBalance(resp.totalUsdt);
+        setSolBalance(resp.solBalance || 0);
+        setEvmBalance(resp.evmBalance || 0);
+      }
     } catch (error) {
       console.error('Error fetching balance:', error);
     } finally {
@@ -222,23 +251,13 @@ const Wallet = () => {
 
           {/* Balance card */}
           <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 18, padding: 18 }}>
-            <div style={{ color: C.muted, fontSize: 12, marginBottom: 6, fontWeight: 500 }}>Available Balance</div>
+            <div style={{ color: C.muted, fontSize: 12, marginBottom: 6, fontWeight: 500 }}>Total Balance</div>
             {loadingBalance ? (
               <div className="skl skl-number-lg" style={{ marginBottom: 4 }} />
             ) : (
-              <div style={{ fontWeight: 800, fontSize: 34, letterSpacing: -1 }}>${usdtBalance ? usdtBalance.toFixed(6) : '0.000000'}</div>
+              <div style={{ fontWeight: 800, fontSize: 34, letterSpacing: -1 }}>${usdtBalance ? usdtBalance.toFixed(2) : '0.00'}</div>
             )}
-            <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>USDC</div>
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green }} />
-                <span style={{ fontSize: 13, color: C.sub }}>Solana + Arbitrum Active</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <SolLogo />
-                <ArbLogo />
-              </div>
-            </div>
+            <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>USDC · Solana + Arbitrum</div>
           </div>
 
           {/* Disconnect button */}
@@ -330,7 +349,9 @@ const Wallet = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '12px 16px' }}>
               <span style={{ color: C.muted, fontSize: 13 }}>Available</span>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{usdtBalance ? usdtBalance.toFixed(2) : '0.00'} {coinLabel}</span>
+              <span style={{ fontWeight: 600, fontSize: 13 }}>
+                {selectedCoin === 'USDC-SOL' ? solBalance.toFixed(2) : evmBalance.toFixed(2)} {coinLabel}
+              </span>
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16 }}>
@@ -350,7 +371,7 @@ const Wallet = () => {
                 {['25', '50', '100', 'MAX'].map(v => (
                   <button
                     key={v}
-                    onClick={() => setWithdrawAmt(v === 'MAX' ? String(usdtBalance?.toFixed(2) || '0') : v)}
+                    onClick={() => { const chainBal = selectedCoin === 'USDC-SOL' ? solBalance : evmBalance; setWithdrawAmt(v === 'MAX' ? String(chainBal.toFixed(2)) : v); }}
                     style={{ flex: 1, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '6px 0', color: C.sub, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                   >
                     {v === 'MAX' ? 'Max' : `$${v}`}
@@ -400,23 +421,94 @@ const Wallet = () => {
 
         {/* Connected wallet — hidden per client request */}
 
-        {/* Supported networks */}
+        {/* Supported networks — with per-chain balances */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 14 }}>SUPPORTED NETWORKS</div>
           <div style={{ display: 'flex', gap: 12 }}>
             {[
-              { Logo: ArbLogo, name: 'Arbitrum One', color: '#28A0F0' },
-              { Logo: SolLogo, name: 'Solana',       color: '#9945FF' },
+              { Logo: ArbLogo, name: 'Arbitrum One', color: '#28A0F0', balance: evmBalance },
+              { Logo: SolLogo, name: 'Solana',       color: '#9945FF', balance: solBalance },
             ].map((n, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: C.surface, borderRadius: 12, padding: '12px 14px', border: `1px solid ${C.border}` }}>
                 <n.Logo />
-                <div>
+                <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{n.name}</div>
                   <div style={{ fontSize: 11, color: n.color, marginTop: 2 }}>Active</div>
                 </div>
+                {loadingBalance
+                  ? <div className="skl" style={{ height: 14, width: 40, borderRadius: 4 }} />
+                  : <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>${n.balance.toFixed(2)}</div>
+                }
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Transaction history — switches with active tab */}
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 14 }}>
+            {tab === 'deposit' ? 'DEPOSIT HISTORY' : 'WITHDRAWAL HISTORY'}
+          </div>
+
+          {historyLoading ? (
+            [0,1,2].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: `1px solid ${C.border}` }}>
+                <div className="skl" style={{ width: 36, height: 36, borderRadius: 10, flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div className="skl" style={{ height: 13, width: '50%', borderRadius: 4, marginBottom: 6 }} />
+                  <div className="skl" style={{ height: 11, width: '35%', borderRadius: 4 }} />
+                </div>
+                <div className="skl" style={{ height: 13, width: 50, borderRadius: 4 }} />
+              </div>
+            ))
+          ) : tab === 'deposit' ? (
+            depositHistory.length === 0
+              ? <div style={{ textAlign: 'center', color: C.muted, fontSize: 13, padding: '20px 0' }}>No deposits yet</div>
+              : depositHistory.slice(0, 20).map((d, i) => {
+                  const isLast = i === Math.min(depositHistory.length, 20) - 1;
+                  const statusColor = d.status === 'COMPLETE' ? C.green : d.status === 'CANCEL' ? C.red : '#f59e0b';
+                  const date = new Date(d.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+                  return (
+                    <div key={d._id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: isLast ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C.green}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>↓</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>+${Number(d.Amount || 0).toFixed(2)} <span style={{ color: C.muted, fontWeight: 400 }}>{d.currencySymbol}</span></div>
+                        <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span>{date}</span>
+                          {d.txHash && <span style={{ fontFamily: 'monospace' }}>· {d.txHash.slice(0, 8)}…</span>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: statusColor, background: `${statusColor}15`, padding: '3px 8px', borderRadius: 6, flexShrink: 0 }}>
+                        {d.status}
+                      </div>
+                    </div>
+                  );
+                })
+          ) : (
+            withdrawHistory.length === 0
+              ? <div style={{ textAlign: 'center', color: C.muted, fontSize: 13, padding: '20px 0' }}>No withdrawals yet</div>
+              : withdrawHistory.slice(0, 20).map((w, i) => {
+                  const isLast = i === Math.min(withdrawHistory.length, 20) - 1;
+                  const statusMap = { 0: ['Pending', '#f59e0b'], 1: ['Processing', '#f59e0b'], 2: ['Complete', C.green], 3: ['Cancelled', C.red], 4: ['Failed', C.red] };
+                  const [label, color] = statusMap[w.status] || ['Unknown', C.muted];
+                  const date = new Date(w.created_at || w.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
+                  return (
+                    <div key={w._id || i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: isLast ? 'none' : `1px solid ${C.border}` }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C.red}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>↑</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>-${Number(w.amount || 0).toFixed(2)} <span style={{ color: C.muted, fontWeight: 400 }}>{w.currency_symbol}</span></div>
+                        <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span>{date}</span>
+                          {w.txn_id && <span style={{ fontFamily: 'monospace' }}>· {w.txn_id.slice(0, 8)}…</span>}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color, background: `${color}15`, padding: '3px 8px', borderRadius: 6, flexShrink: 0 }}>
+                        {label}
+                      </div>
+                    </div>
+                  );
+                })
+          )}
         </div>
       </div>
 

@@ -3476,19 +3476,22 @@ async function userWithdrawHandler(data) {
     }
     // USDC (SOL or ARB) is 1:1 with USD — no conversion needed
 
-    // 3. Check userPublicWallet.balance
-    const { balance: availableBalance } = await getBalance(telegramId);
-    if (availableBalance < parseFloat(Amount)) {
-      return { success: false, Message: `Insufficient balance. You have $${availableBalance.toFixed(2)}` };
+    // 3. Check per-chain balance — user can only withdraw from the chain they deposited on
+    const { balance: availableBalance, solBalance, evmBalance } = await getBalance(telegramId);
+    const amountNum = parseFloat(Amount);
+    if (currency === 'SOL' || currency === 'USDC') {
+      if (solBalance < amountNum) {
+        return { success: false, Message: `Insufficient Solana balance. You have $${solBalance.toFixed(2)} on Solana` };
+      }
+    } else if (currency === 'ARB') {
+      if (evmBalance < amountNum) {
+        return { success: false, Message: `Insufficient EVM balance. You have $${evmBalance.toFixed(2)} on Arbitrum` };
+      }
+    } else {
+      if (availableBalance < amountNum) {
+        return { success: false, Message: `Insufficient balance. You have $${availableBalance.toFixed(2)}` };
+      }
     }
-
-    // 4. Load user's custodial wallets
-    const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
-    const userSolWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase() === 'SOL');
-    const userArbWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase().includes('ARB'));
-
-    if (currency === 'USDC' && !userSolWallet) return { success: false, Message: "No SOL custodial wallet found" };
-    if (currency === 'ARB'  && !userArbWallet) return { success: false, Message: "No ARB custodial wallet found" };
 
     // Admin keypairs — used only as fee payer for Solana gas, and ETH gas top-up for EVM
     const _solAdminKeypair = () => {
@@ -3500,10 +3503,23 @@ async function userWithdrawHandler(data) {
       return new ethers.Wallet(process.env.EVM_PRIVATE_KEY, provider);
     };
 
-    // 5. RESERVE: atomic hold
+    // 4. Load user's custodial wallets — verify before touching balance
+    const custodialDoc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+    const userSolWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase() === 'SOL');
+    const userArbWallet = custodialDoc?.wallets?.find(w => (w.network || '').toUpperCase().includes('ARB'));
+
+    if ((currency === 'USDC' || currency === 'SOL') && !userSolWallet) return { success: false, Message: "No SOL custodial wallet found" };
+    if (currency === 'ARB' && !userArbWallet) return { success: false, Message: "No ARB custodial wallet found" };
+
+    // 5. RESERVE: atomic hold (also deduct chain-specific balance)
+    const holdChainDec = (currency === 'SOL' || currency === 'USDC')
+      ? { balance: -amountNum, holdBalance: +amountNum, solBalance: -amountNum }
+      : currency === 'ARB'
+        ? { balance: -amountNum, holdBalance: +amountNum, evmBalance: -amountNum }
+        : { balance: -amountNum, holdBalance: +amountNum };
     await userPublicWallet.updateOne(
       { telegramId: String(telegramId) },
-      { $inc: { balance: -parseFloat(Amount), holdBalance: +parseFloat(Amount) } }
+      { $inc: holdChainDec }
     );
 
     // 6. Create withdrawal record (PENDING)
@@ -3517,13 +3533,12 @@ async function userWithdrawHandler(data) {
       txn_id: "",
     });
 
-    // 7. Send from user's custodial wallet
+    // 7. Send from user's custodial wallet (decentralized — each user owns their funds)
     try {
       let txHash;
 
       if (currency === "SOL") {
-        // Native SOL — sent from user's custodial SOL wallet
-        // Admin is fee payer so user does not need SOL for gas
+        // Native SOL — user's custodial wallet sends, admin is fee payer so user needs no gas
         const adminKeypair = _solAdminKeypair();
         const connection = await createConnection();
         const userSolPk = await common.decrypt(userSolWallet.privateKey);
@@ -3538,8 +3553,7 @@ async function userWithdrawHandler(data) {
         txHash = sig;
 
       } else if (currency === "USDC") {
-        // USDC SPL — sent from user's own ATA
-        // Admin is fee payer so user does not need SOL for gas
+        // USDC SPL — user's custodial wallet sends, admin is fee payer
         const adminKeypair = _solAdminKeypair();
         const connection = await createConnection();
         const userSolPk = await common.decrypt(userSolWallet.privateKey);
@@ -3557,19 +3571,16 @@ async function userWithdrawHandler(data) {
         }
         const amountRaw = Math.floor(cryptoAmount * 1_000_000); // 6 decimals
         tx.add(createTransferInstruction(userATA, receiverATA, userKeypair.publicKey, amountRaw));
-        // Both admin (fee payer) and user (token authority) must sign
         const sig = await sendAndConfirmTransaction(connection, tx, [adminKeypair, userKeypair]);
         txHash = sig;
 
       } else if (currency === "ARB") {
-        // USDC ERC-20 — sent from user's custodial ARB wallet
-        // Admin tops up ETH gas if user's wallet balance is too low
+        // USDC ERC-20 — user's custodial ARB wallet sends; admin tops up ETH gas if needed
         const provider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
         const userArbPk = await common.decrypt(userArbWallet.privateKey);
         const userEthWallet = new ethers.Wallet(userArbPk, provider);
         const amountParsed = ethers.parseUnits(cryptoAmount.toFixed(6), 6);
 
-        // Estimate gas needed for the USDC transfer
         const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, userEthWallet);
         const gasPrice = (await provider.getFeeData()).gasPrice;
         const gasEstimate = await usdc.transfer.estimateGas(cleanAddress(Address), amountParsed);
@@ -3577,7 +3588,6 @@ async function userWithdrawHandler(data) {
 
         const ethBalance = await provider.getBalance(userEthWallet.address);
         if (ethBalance < gasCost) {
-          // Top up with enough ETH to cover gas + a small buffer
           const topUp = gasCost * 2n;
           const adminEthWallet = _evmAdminWallet(provider);
           const fundTx = await adminEthWallet.sendTransaction({ to: userEthWallet.address, value: topUp });
@@ -3610,9 +3620,14 @@ async function userWithdrawHandler(data) {
         { _id: withdrawalDoc._id },
         { $set: { status: 4 } }  // 4 = admincancel / FAILED
       );
+      const refundChainInc = (currency === 'SOL' || currency === 'USDC')
+        ? { balance: +amountNum, holdBalance: -amountNum, solBalance: +amountNum }
+        : currency === 'ARB'
+          ? { balance: +amountNum, holdBalance: -amountNum, evmBalance: +amountNum }
+          : { balance: +amountNum, holdBalance: -amountNum };
       await userPublicWallet.updateOne(
         { telegramId: String(telegramId) },
-        { $inc: { balance: +parseFloat(Amount), holdBalance: -parseFloat(Amount) } }
+        { $inc: refundChainInc }
       );
       return { success: false, status: "FAILED", Message: `Withdrawal failed: ${sendErr.message}` };
     }
@@ -4184,6 +4199,8 @@ async function getBalance(telegramId) {
   return {
     balance:     doc?.balance     || 0,
     holdBalance: doc?.holdBalance || 0,
+    solBalance:  doc?.solBalance  || 0,
+    evmBalance:  doc?.evmBalance  || 0,
   };
 }
 
@@ -4192,11 +4209,13 @@ async function userBalanceHandler(data) {
     if (!data.telegramId) {
       return { success: false, code: 400, message: "Missing parameters" };
     }
-    const { balance, holdBalance } = await getBalance(data.telegramId);
+    const { balance, holdBalance, solBalance, evmBalance } = await getBalance(data.telegramId);
     return {
       success: true,
       totalUsdt: Number(balance.toFixed(6)),
       holdBalance: Number(holdBalance.toFixed(6)),
+      solBalance: Number(solBalance.toFixed(6)),
+      evmBalance: Number(evmBalance.toFixed(6)),
       message: "Balance fetched successfully",
     };
   } catch (error) {
@@ -5905,24 +5924,18 @@ async function processAllWalletDeposits() {
 
         // Credit total amount to balance (once per wallet)
         const totalAmount = walletNewDeposits.reduce((sum, { amount }) => sum + amount, 0);
+        const chainInc = network === 'SOL'
+          ? { balance: totalAmount, solBalance: totalAmount }
+          : { balance: totalAmount, evmBalance: totalAmount };
         await UserPublicWallet.updateOne(
           { telegramId },
-          { $inc: { balance: totalAmount } }
+          { $inc: chainInc }
         );
         console.log(`💰 Credited $${totalAmount} to user ${telegramId}`);
         totalNewDeposits += walletNewDeposits.length;
         totalWalletsUpdated++;
 
-        // Sweep funds to admin wallet (once per wallet)
-        let sweepResult;
-        if (network === 'SOL') {
-          sweepResult = await transferUSDC_Solana(telegramId, totalAmount);
-        } else if (network === 'ARB' || network === 'EVM') {
-          sweepResult = await transferUSDC_EVM(telegramId, network, totalAmount);
-        } else {
-          console.warn(`Unsupported network for sweep: ${network} — skipping`);
-        }
-        console.log(sweepResult, "----- sweep result -----");
+        // Funds stay in user's custodial wallet — no sweep to admin (decentralized custody model)
       }
     }
     const endTime = Date.now();
@@ -6690,9 +6703,12 @@ async function sweepUserDepositsHandler(data) {
       }
 
       const totalAmount = newTxs.reduce((s, { amount }) => s + amount, 0);
+      const sweepChainInc = (network || '').toUpperCase() === 'SOL'
+        ? { balance: totalAmount, solBalance: totalAmount }
+        : { balance: totalAmount, evmBalance: totalAmount };
       await UserPublicWallet.updateOne(
         { telegramId: String(telegramId) },
-        { $inc: { balance: totalAmount } }
+        { $inc: sweepChainInc }
       );
 
       console.log(`[sweep] user ${telegramId} — credited $${totalAmount} from ${newTxs.length} new tx(s) on ${network}`);

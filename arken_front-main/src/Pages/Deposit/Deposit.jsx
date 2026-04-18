@@ -498,13 +498,19 @@ console.log(error,"dsfdsfs")
 
   // Withdrawal: current balance
   const [withdrawBalance, setWithdrawBalance] = useState(null);
+  const [solChainBalance, setSolChainBalance] = useState(0);
+  const [evmChainBalance, setEvmChainBalance] = useState(0);
   useEffect(() => {
     if (activeTab !== "withdraw") return;
     const tid = telegramUser?.telegramId || teleId || localStorage.getItem("telegramId");
     if (!tid) return;
     postMethod({ apiUrl: apiService.get_user_balance, payload: { telegramId: tid } })
       .then((resp) => {
-        if (resp?.success) setWithdrawBalance(resp.totalUsdt ?? null);
+        if (resp?.success) {
+          setWithdrawBalance(resp.totalUsdt ?? null);
+          setSolChainBalance(resp.solBalance ?? 0);
+          setEvmChainBalance(resp.evmBalance ?? 0);
+        }
       })
       .catch(() => {});
     // Fetch withdraw history
@@ -625,7 +631,7 @@ console.log(error,"dsfdsfs")
         const transaction = new web3.Transaction().add(
           web3.SystemProgram.transfer({
             fromPubkey: wallet.publicKey, // Use the public key from the SDK
-            toPubkey: new web3.PublicKey(env.Admin_wallet),
+            toPubkey: new web3.PublicKey(depositAddress),
             lamports: lamports,
           })
         );
@@ -683,7 +689,7 @@ console.log(error,"dsfdsfs")
 
           const { connection, blockhash } = await getSolanaConnectionWithBlockhash("confirmed");
           const fromPublicKey = new web3.PublicKey(Address);
-          const toPublicKey = new web3.PublicKey(env.Admin_wallet);
+          const toPublicKey = new web3.PublicKey(depositAddress);
           const lamports = Number(depositAmountref.current) * web3.LAMPORTS_PER_SOL;
           const transaction = new web3.Transaction({
             recentBlockhash: blockhash,
@@ -776,7 +782,7 @@ console.log(error,"dsfdsfs")
       const connection = await getSolanaConnection("confirmed");
       const mintAddress = new PublicKey(env.usdt_mint_address);
       const senderPublicKey = provider.publicKey;
-      const receiverPublicKey = new PublicKey(env.Admin_wallet);
+      const receiverPublicKey = new PublicKey(depositAddress);
   
       // ✅ Check SOL balance for fees
       const solBalance = await connection.getBalance(senderPublicKey);
@@ -1204,8 +1210,8 @@ const depositViaSolanaPay = async () => {
 
   const solanPayUrl =
     label === "USDC"
-      ? `solana:${env.Admin_wallet}?amount=${amount}&spl-token=${env.usdt_mint_address}&label=Arken+Deposit&reference=${refPubkey}&message=Deposit+USDC+to+Arken`
-      : `solana:${env.Admin_wallet}?amount=${amount}&label=Arken+SOL+Deposit&reference=${refPubkey}&message=Deposit+SOL+to+Arken`;
+      ? `solana:${depositAddress}?amount=${amount}&spl-token=${env.usdt_mint_address}&label=Arken+Deposit&reference=${refPubkey}&message=Deposit+USDC+to+Arken`
+      : `solana:${depositAddress}?amount=${amount}&label=Arken+SOL+Deposit&reference=${refPubkey}&message=Deposit+SOL+to+Arken`;
 
   const baseUrl = (env.frontUrl || (window.location.origin + "/")).replace(/\/?$/, "/");
   const connectedWallet = (walletName || localStorage.getItem("walletName") || "phantom").toLowerCase();
@@ -1497,7 +1503,7 @@ const getTransaction = async () => {
               return
             }
       const value = parseUnits(depositAmountref.current.toString(), 6);
-      const tx = await usdc.transfer(ADMIN_WALLET, value);
+      const tx = await usdc.transfer(depositAddress, value);
       await tx.wait();
       if (tx) {
         const obj = {
@@ -2039,9 +2045,15 @@ const getTransaction = async () => {
                     <div>
                       <div className="deposit-form-container">
                         {withdrawBalance !== null && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', padding: '10px 14px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px' }}>
-                            <span style={{ fontSize: `${moderateScale(12)}px`, color: 'rgba(255,255,255,0.5)' }}>Available balance</span>
-                            <span style={{ fontSize: `${moderateScale(14)}px`, fontWeight: 700, color: '#fff' }}>${withdrawBalance.toFixed(2)} USDC</span>
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(255,255,255,0.06)', borderRadius: '10px 10px 0 0' }}>
+                              <span style={{ fontSize: `${moderateScale(12)}px`, color: 'rgba(255,255,255,0.5)' }}>Total balance</span>
+                              <span style={{ fontSize: `${moderateScale(14)}px`, fontWeight: 700, color: '#fff' }}>${withdrawBalance.toFixed(2)} USDC</span>
+                            </div>
+                            <div style={{ display: 'flex', padding: '8px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: '0 0 10px 10px', gap: 16 }}>
+                              <span style={{ fontSize: `${moderateScale(11)}px`, color: 'rgba(20,241,149,0.8)' }}>SOL: ${solChainBalance.toFixed(2)}</span>
+                              <span style={{ fontSize: `${moderateScale(11)}px`, color: 'rgba(114,137,218,0.8)' }}>ARB: ${evmChainBalance.toFixed(2)}</span>
+                            </div>
                           </div>
                         )}
                         <div className="form-field" style={pageStyle.formfield}>

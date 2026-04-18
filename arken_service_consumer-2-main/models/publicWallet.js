@@ -5,6 +5,8 @@ const userPublicWallet = mongoose.Schema(
     telegramId: { type: String, unique: true, index: true },
     balance:     { type: Number, default: 0 },
     holdBalance: { type: Number, default: 0 },
+    solBalance:  { type: Number, default: 0 },
+    evmBalance:  { type: Number, default: 0 },
     wallets: [
       {
         network: { type: String, default: "" },
