@@ -1702,11 +1702,46 @@ async function getMergedMarketsHandler(data) {
       "isPrivate",
     ];
 
+    // Batch-compute live prices from predictions for all manual markets in one query
+    const manualIds = merged
+      .filter(m => m._id && mongoose.Types.ObjectId.isValid(String(m._id)))
+      .map(m => new mongoose.Types.ObjectId(String(m._id)));
+
+    const livePools = manualIds.length > 0
+      ? await Prediction.aggregate([
+          { $match: { manualId: { $in: manualIds }, status: 'OPEN' } },
+          { $group: { _id: { marketId: '$manualId', outcome: '$outcomeIndex' }, pool: { $sum: '$amount' } } },
+        ])
+      : [];
+
+    // Index pools by market id string
+    const poolsByMarket = {};
+    livePools.forEach(({ _id, pool }) => {
+      const mid = String(_id.marketId);
+      if (!poolsByMarket[mid]) poolsByMarket[mid] = {};
+      poolsByMarket[mid][_id.outcome] = pool;
+    });
+
     const finalData = merged.map((item) => {
       const filtered = {};
       keysToKeep.forEach((k) => {
         if (item[k] !== undefined) filtered[k] = item[k];
       });
+      const mid = String(item._id);
+      const outcomeMap = poolsByMarket[mid];
+      if (outcomeMap) {
+        const outcomeCount = Array.isArray(item.outcomes) ? item.outcomes.length : 2;
+        const totalPool = Object.values(outcomeMap).reduce((s, v) => s + v, 0);
+        if (totalPool > 0) {
+          filtered.outcomePrices = [];
+          filtered.chancePercents = [];
+          for (let i = 0; i < outcomeCount; i++) {
+            const price = (outcomeMap[i] || 0) / totalPool;
+            filtered.outcomePrices.push(parseFloat(price.toFixed(4)));
+            filtered.chancePercents.push(parseFloat((price * 100).toFixed(2)));
+          }
+        }
+      }
       return { ...filtered, ...normalizeMarketForUI(filtered) };
     });
 
