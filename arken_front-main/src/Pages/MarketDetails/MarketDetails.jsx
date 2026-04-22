@@ -427,7 +427,7 @@ const MarketDetails = () => {
 
   const status = market?.marketStatus || (market?.active ? 'active' : 'closed');
   const isActive = status === 'active';
-  const yesPercent = market?.chancePercents?.[0] || 50;
+  const yesPercent = market?.chancePercents?.[0] ?? market?.yes ?? 50;
   const noPercent = 100 - yesPercent;
   const isMulti = market?.type === 'multi' || (market?.outcomes?.length > 2);
 

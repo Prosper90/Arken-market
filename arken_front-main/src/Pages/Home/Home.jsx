@@ -265,6 +265,13 @@ const Home = () => {
 
   useEffect(() => { fetchHomeTodayNews(); }, []);
 
+  // Refresh market list when user returns to this tab (e.g. after placing a bet in MarketDetails)
+  useEffect(() => {
+    const onFocus = () => { setMarkets([]); getMarketsStats(false); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, []);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveIndex(prev => (prev + 1) % (news.length || 1));
@@ -477,7 +484,7 @@ const Home = () => {
           ))
         ) : mergedList.length > 0 ? (
           mergedList.map((item, index) => {
-            const yesPercent = item.chancePercents?.[0] || 50;
+            const yesPercent = item.chancePercents?.[0] ?? item.yes ?? 50;
             const noPercent = 100 - yesPercent;
             const statusLabel = item.marketStatus
               ? item.marketStatus.charAt(0).toUpperCase() + item.marketStatus.slice(1)

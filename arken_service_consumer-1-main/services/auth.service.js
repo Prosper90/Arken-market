@@ -1750,6 +1750,27 @@ async function getMergedMarketByIdHandler(data) {
     }).lean();
 
     if (market) {
+      // Compute live prices from open predictions — avoids write-then-read race
+      const pools = await Prediction.aggregate([
+        { $match: { manualId: objectId, status: 'OPEN' } },
+        { $group: { _id: '$outcomeIndex', pool: { $sum: '$amount' } } },
+      ]);
+      if (pools.length > 0) {
+        const outcomeCount = market.outcomes?.length || 2;
+        const poolMap = {};
+        pools.forEach(p => { poolMap[p._id] = p.pool; });
+        const totalPool = Object.values(poolMap).reduce((s, v) => s + v, 0);
+        if (totalPool > 0) {
+          market.outcomePrices = [];
+          market.chancePercents = [];
+          for (let i = 0; i < outcomeCount; i++) {
+            const price = (poolMap[i] || 0) / totalPool;
+            market.outcomePrices.push(parseFloat(price.toFixed(4)));
+            market.chancePercents.push(parseFloat((price * 100).toFixed(2)));
+          }
+        }
+      }
+
       const manualData = {
         _id: market._id,
         question: market.question,
@@ -2640,7 +2661,7 @@ async function userbetplaceHandler(data) {
     await user.save();
 
     // Update market pool prices and liquidity from actual bet totals
-    if (source === 'manual' && manualId) {
+    if (manualId && source !== 'poly') {
       await updateMarketPrices(manualId);
     }
 
