@@ -426,18 +426,15 @@ const Wallet = () => {
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 14 }}>SUPPORTED NETWORKS</div>
           <div style={{ display: 'flex', gap: 12 }}>
             {[
-              { Logo: ArbLogo, name: 'Arbitrum One', color: '#28A0F0', balance: evmBalance },
-              { Logo: SolLogo, name: 'Solana',       color: '#9945FF', balance: solBalance },
+              { Logo: ArbLogo, name: 'Arb', color: '#28A0F0', balance: evmBalance },
+              { Logo: SolLogo, name: 'Sol', color: '#9945FF', balance: solBalance },
             ].map((n, i) => (
-              <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: C.surface, borderRadius: 12, padding: '12px 14px', border: `1px solid ${C.border}` }}>
-                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, background: `${n.color}18` }}><n.Logo /></div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13 }}>{n.name}</div>
-                  <div style={{ fontSize: 11, color: n.color, marginTop: 2 }}>Active</div>
-                </div>
+              <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: C.surface, borderRadius: 12, padding: '14px 10px', border: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 12, background: `${n.color}18` }}><n.Logo /></div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{n.name}</div>
                 {loadingBalance
-                  ? <div className="skl" style={{ height: 14, width: 40, borderRadius: 4 }} />
-                  : <div style={{ fontWeight: 700, fontSize: 13, color: C.text }}>${n.balance.toFixed(2)}</div>
+                  ? <div className="skl" style={{ height: 13, width: 44, borderRadius: 4 }} />
+                  : <div style={{ fontWeight: 700, fontSize: 13, color: n.color }}>${n.balance.toFixed(2)}</div>
                 }
               </div>
             ))}

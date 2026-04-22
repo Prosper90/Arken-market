@@ -90,6 +90,13 @@ async function placeBet({ privateKey, marketAddress, optionIndex, amountUsdt, re
   const signer = getSignerFromPrivateKey(privateKey);
   const amountWei = ethers.parseUnits(String(amountUsdt), USDT_DECIMALS);
 
+  // Check user has enough ETH to cover gas — if not, surface a clear message
+  const GAS_THRESHOLD = ethers.parseEther("0.0005");
+  const ethBalance = await provider.getBalance(signer.address);
+  if (ethBalance < GAS_THRESHOLD) {
+    throw new Error(`Insufficient ETH for gas fees. Your Arbitrum wallet (${signer.address}) has ${ethers.formatEther(ethBalance)} ETH — please deposit at least 0.001 ETH to cover transaction fees.`);
+  }
+
   // Step 1: Check and set USDT allowance
   const usdt = getUsdtContract(signer);
   const currentAllowance = await usdt.allowance(signer.address, marketAddress);

@@ -388,8 +388,16 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referr
     return null;
   }
 
-  const keypair = loadKeypair(privateKey);
-  const program = getProgram(keypair);
+  const keypair    = loadKeypair(privateKey);
+  const program    = getProgram(keypair);
+  const connection = getConnection();
+
+  // Check user has enough SOL to cover gas — if not, surface a clear message
+  const MIN_LAMPORTS = 10_000;
+  const solBalance = await connection.getBalance(keypair.publicKey);
+  if (solBalance < MIN_LAMPORTS) {
+    throw new Error(`Insufficient SOL for gas fees. Your Solana wallet (${keypair.publicKey.toBase58()}) has ${solBalance / 1e9} SOL — please deposit at least 0.001 SOL to cover transaction fees.`);
+  }
 
   const marketIdArray  = mongoIdToBytes32(mongodbId);
   const amountLamports = new BN(Math.round(amountUsdc * 10 ** USDC_DECIMALS));
@@ -434,8 +442,16 @@ async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer })
     return null;
   }
 
-  const keypair = loadKeypair(privateKey);
-  const program = getProgram(keypair);
+  const keypair    = loadKeypair(privateKey);
+  const program    = getProgram(keypair);
+  const connection = getConnection();
+
+  // Check user has enough SOL to cover gas — if not, surface a clear message
+  const MIN_LAMPORTS = 10_000;
+  const solBalance = await connection.getBalance(keypair.publicKey);
+  if (solBalance < MIN_LAMPORTS) {
+    throw new Error(`Insufficient SOL for gas fees. Your Solana wallet (${keypair.publicKey.toBase58()}) has ${solBalance / 1e9} SOL — please deposit at least 0.001 SOL to cover transaction fees.`);
+  }
 
   const marketIdArray  = mongoIdToBytes32(mongodbId);
   const pct = sellPercentage && Number(sellPercentage) > 0
