@@ -430,7 +430,7 @@ const Wallet = () => {
               { Logo: SolLogo, name: 'Solana',       color: '#9945FF', balance: solBalance },
             ].map((n, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, background: C.surface, borderRadius: 12, padding: '12px 14px', border: `1px solid ${C.border}` }}>
-                <n.Logo />
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 10, background: `${n.color}18` }}><n.Logo /></div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{n.name}</div>
                   <div style={{ fontSize: 11, color: n.color, marginTop: 2 }}>Active</div>

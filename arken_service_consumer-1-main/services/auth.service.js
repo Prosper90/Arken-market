@@ -4234,8 +4234,9 @@ async function getBalance(telegramId) {
   const evmWallet = doc.wallets?.find(w => (w.network || '').toUpperCase().includes('ARB'));
   if (evmWallet?.address) {
     try {
-      const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, evmProvider);
-      const raw = await usdcContract.balanceOf(evmWallet.address);
+      const arbProvider = new ethers.JsonRpcProvider(process.env.ARB_RPC_URL || process.env.ARB_RPC || ARB_RPC);
+      const usdcContract = new ethers.Contract(cleanAddress(USDC_ADDRESS), ERC20_ABI, arbProvider);
+      const raw = await usdcContract.balanceOf(cleanAddress(evmWallet.address));
       const chainEvm = Number(ethers.formatUnits(raw, 6));
       if (chainEvm > evmBalance) {
         const diff = chainEvm - evmBalance;
