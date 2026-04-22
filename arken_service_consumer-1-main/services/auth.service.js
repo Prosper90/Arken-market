@@ -2477,6 +2477,8 @@ async function userbetplaceHandler(data) {
       user.totalPredictions += 1;
       await user.save();
 
+      if (manualId) updateMarketPrices(manualId).catch(() => {});
+
       return {
         success: true,
         data: { ...prediction.toObject(), evmTxHash: txHash },
@@ -2558,6 +2560,8 @@ async function userbetplaceHandler(data) {
       user.totalPredictions += 1;
       await user.save();
 
+      if (manualId) updateMarketPrices(manualId).catch(() => {});
+
       return {
         success: true,
         data: { ...prediction.toObject(), evmTxHash: solResult?.txHash },
@@ -2634,6 +2638,11 @@ async function userbetplaceHandler(data) {
 
     user.totalPredictions += 1;
     await user.save();
+
+    // Update market pool prices and liquidity from actual bet totals
+    if (source === 'manual' && manualId) {
+      updateMarketPrices(manualId).catch(() => {});
+    }
 
     // --- Fee split at bet time ---
     try {
@@ -4196,12 +4205,90 @@ const createWithdraw = await WithdrawDB.create(withdraw_obj);
 
 async function getBalance(telegramId) {
   const doc = await UserPublicWallet.findOne({ telegramId: String(telegramId) });
+  if (!doc) return { balance: 0, holdBalance: 0, solBalance: 0, evmBalance: 0 };
+
+  let { balance = 0, holdBalance = 0, solBalance = 0, evmBalance = 0 } = doc;
+  const inc = {};
+
+  // Sync SOL USDC balance from chain — only credit unclaimed deposits (never decrement)
+  const solWallet = doc.wallets?.find(w => (w.network || '').toUpperCase() === 'SOL');
+  if (solWallet?.address) {
+    try {
+      const mintPk = new PublicKey(process.env.SOLANA_USDC_MINT || 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      const ownerPk = new PublicKey(solWallet.address);
+      const { value: accounts } = await PROVIDERS.SOL.getParsedTokenAccountsByOwner(ownerPk, { mint: mintPk });
+      const chainSol = accounts.reduce((s, a) => s + (a.account.data.parsed?.info?.tokenAmount?.uiAmount || 0), 0);
+      if (chainSol > solBalance) {
+        const diff = chainSol - solBalance;
+        inc.solBalance = diff;
+        inc.balance = (inc.balance || 0) + diff;
+        solBalance = chainSol;
+        balance += diff;
+      }
+    } catch (e) {
+      console.error('[getBalance] SOL sync error:', e.message);
+    }
+  }
+
+  // Sync EVM USDC balance from chain — only credit unclaimed deposits (never decrement)
+  const evmWallet = doc.wallets?.find(w => (w.network || '').toUpperCase().includes('ARB'));
+  if (evmWallet?.address) {
+    try {
+      const usdcContract = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, evmProvider);
+      const raw = await usdcContract.balanceOf(evmWallet.address);
+      const chainEvm = Number(ethers.formatUnits(raw, 6));
+      if (chainEvm > evmBalance) {
+        const diff = chainEvm - evmBalance;
+        inc.evmBalance = diff;
+        inc.balance = (inc.balance || 0) + diff;
+        evmBalance = chainEvm;
+        balance += diff;
+      }
+    } catch (e) {
+      console.error('[getBalance] EVM sync error:', e.message);
+    }
+  }
+
+  if (Object.keys(inc).length > 0) {
+    await UserPublicWallet.updateOne({ telegramId: String(telegramId) }, { $inc: inc });
+  }
+
   return {
-    balance:     doc?.balance     || 0,
-    holdBalance: doc?.holdBalance || 0,
-    solBalance:  doc?.solBalance  || 0,
-    evmBalance:  doc?.evmBalance  || 0,
+    balance:     Math.max(0, balance),
+    holdBalance,
+    solBalance:  Math.max(0, solBalance),
+    evmBalance:  Math.max(0, evmBalance),
   };
+}
+
+async function updateMarketPrices(manualId, betAmount) {
+  if (!manualId) return;
+  try {
+    const pools = await Prediction.aggregate([
+      { $match: { manualId: manualId.toString(), status: 'OPEN' } },
+      { $group: { _id: '$outcomeIndex', pool: { $sum: '$amount' } } },
+    ]);
+    const market = await Market.findById(manualId);
+    if (!market) return;
+    const outcomeCount = market.outcomes?.length || 2;
+    const poolMap = {};
+    pools.forEach(p => { poolMap[p._id] = p.pool; });
+    const totalPool = Object.values(poolMap).reduce((s, v) => s + v, 0);
+    if (totalPool <= 0) return;
+    const outcomePrices = [];
+    const chancePercents = [];
+    for (let i = 0; i < outcomeCount; i++) {
+      const pool = poolMap[i] || 0;
+      const price = pool / totalPool;
+      outcomePrices.push(parseFloat(price.toFixed(4)));
+      chancePercents.push(parseFloat((price * 100).toFixed(2)));
+    }
+    await Market.findByIdAndUpdate(manualId, {
+      $set: { outcomePrices, chancePercents, liquidity: totalPool },
+    });
+  } catch (e) {
+    console.error('[updateMarketPrices] Error:', e.message);
+  }
 }
 
 async function userBalanceHandler(data) {

@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Modal from '@mui/material/Modal';
-import Box from '@mui/material/Box';
 
 import apiService from '../../core/sevice/detail';
 import { postMethod } from '../../core/sevice/common.api';
 import { useMarkets } from '../../context/MarketContext';
 import { useTelegramUser } from '../../context/TelegramUserContext';
-import Buyform from '../Buyform';
 import { C } from '../../theme';
 import { BackIcon, PlusIcon } from '../../Components/Icons';
 
@@ -20,10 +17,6 @@ const binanceSymbolMap = {
   NEAR: 'nearusdt', EOS: 'eosusdt', FIL: 'filusdt',
 };
 
-const modalStyle = {
-  position: 'absolute', top: '50%', left: '50%',
-  transform: 'translate(-50%, -50%)', boxShadow: 24,
-};
 
 const ProbabilityChart = ({ yesNow, isMulti }) => {
   const [chartTab, setChartTab] = useState('1W');
@@ -157,12 +150,9 @@ const MarketDetails = () => {
   const [stats, setStats] = useState([]);
   const { markets, setMarkets } = useMarkets();
   const [loadingStats, setLoadingStats] = useState(false);
-  const [isBotStatusActive, setIsBotStatusActive] = useState(false);
-  const [botInitialSide, setBotInitialSide] = useState('buy');
   const [showMore, setShowMore] = useState(false);
   const [market, setMarket] = useState(null);
   const [currentPrice, setCurrentPrice] = useState(null);
-  const [selectedOutcome, setSelectedOutcome] = useState(null);
   const [loading, setLoading] = useState(true);
   const lastUpdateRef = useRef(0);
   const socketRef = useRef(null);
@@ -186,6 +176,13 @@ const MarketDetails = () => {
   const [swapAmt, setSwapAmt] = useState('');
   const [buyLoading, setBuyLoading] = useState(false);
   const [sellLoading, setSellLoading] = useState(false);
+
+  const openSwapSheet = (outcome, side = 'buy') => {
+    setSwapOutcome(outcome);
+    setSwapSide(side);
+    setSwapAmt('');
+    setSwapOpen(true);
+  };
 
   const item = location.state?.item;
 
@@ -278,12 +275,6 @@ const MarketDetails = () => {
     } finally {
       setLpLoading(false);
     }
-  };
-
-  const handleOutcomeClick = (outcome, price, index, side = 'buy') => {
-    setSelectedOutcome({ outcome, price, index, tokenId: market.outcomeTokenIds?.[outcome], side });
-    setBotInitialSide(side);
-    setIsBotStatusActive(true);
   };
 
   const handleDirectBuy = async () => {
@@ -539,7 +530,7 @@ const MarketDetails = () => {
                 const price = market.outcomePrices?.[index];
                 const displayPrice = price ? `${parseFloat(price * 100).toFixed(0)}¢` : '';
                 return (
-                  <button key={index} onClick={() => handleOutcomeClick(outcome, price, index)} style={{ background: `${C.purple}15`, border: `1.5px solid ${C.purple}40`, borderRadius: 14, padding: '12px 10px', cursor: 'pointer', textAlign: 'left' }}>
+                  <button key={index} onClick={() => openSwapSheet(outcome.toLowerCase(), 'buy')} style={{ background: `${C.purple}15`, border: `1.5px solid ${C.purple}40`, borderRadius: 14, padding: '12px 10px', cursor: 'pointer', textAlign: 'left' }}>
                     <div style={{ fontWeight: 700, fontSize: 13, color: C.purpleL }}>{outcome}</div>
                     {displayPrice && <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{displayPrice} per share</div>}
                   </button>
@@ -554,7 +545,7 @@ const MarketDetails = () => {
               const displayPrice = price ? `${parseFloat(price * 100).toFixed(0)}¢` : '';
               const isYes = index === 0;
               return (
-                <button key={index} onClick={() => handleOutcomeClick(outcome, price, index)} style={{ background: isYes ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #dc2626, #b91c1c)', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+                <button key={index} onClick={() => openSwapSheet(index === 0 ? 'yes' : 'no', 'buy')} style={{ background: isYes ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #dc2626, #b91c1c)', color: '#fff', border: 'none', borderRadius: 14, padding: '14px 0', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
                   Buy {outcome} {displayPrice}
                 </button>
               );
@@ -1025,19 +1016,6 @@ const MarketDetails = () => {
         </div>
       )}
 
-      {/* Buyform Modal */}
-      <Modal open={isBotStatusActive} onClose={() => setIsBotStatusActive(false)}>
-        <Box sx={modalStyle} className="bot_modal_box bot_modal_boxnew" style={{ width: 345, padding: '16px 16px 24px' }}>
-          <Buyform
-            market={market}
-            handleBotClose={() => { setIsBotStatusActive(false); fetchMarketById(); }}
-            selectedOutcome={selectedOutcome}
-            predictionId={userPosition?._id}
-            betAmount={userPosition?.betAmount || userPosition?.amount}
-            initialSide={botInitialSide}
-          />
-        </Box>
-      </Modal>
     </div>
   );
 };
