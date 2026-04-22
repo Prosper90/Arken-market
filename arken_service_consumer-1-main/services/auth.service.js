@@ -2477,7 +2477,7 @@ async function userbetplaceHandler(data) {
       user.totalPredictions += 1;
       await user.save();
 
-      if (manualId) updateMarketPrices(manualId).catch(() => {});
+      if (manualId) await updateMarketPrices(manualId);
 
       return {
         success: true,
@@ -2560,7 +2560,7 @@ async function userbetplaceHandler(data) {
       user.totalPredictions += 1;
       await user.save();
 
-      if (manualId) updateMarketPrices(manualId).catch(() => {});
+      if (manualId) await updateMarketPrices(manualId);
 
       return {
         success: true,
@@ -2641,7 +2641,7 @@ async function userbetplaceHandler(data) {
 
     // Update market pool prices and liquidity from actual bet totals
     if (source === 'manual' && manualId) {
-      updateMarketPrices(manualId).catch(() => {});
+      await updateMarketPrices(manualId);
     }
 
     // --- Fee split at bet time ---
@@ -4262,8 +4262,11 @@ async function getBalance(telegramId) {
 async function updateMarketPrices(manualId, betAmount) {
   if (!manualId) return;
   try {
+    const matchId = mongoose.Types.ObjectId.isValid(manualId)
+      ? new mongoose.Types.ObjectId(manualId)
+      : manualId;
     const pools = await Prediction.aggregate([
-      { $match: { manualId: manualId.toString(), status: 'OPEN' } },
+      { $match: { manualId: matchId, status: 'OPEN' } },
       { $group: { _id: '$outcomeIndex', pool: { $sum: '$amount' } } },
     ]);
     const market = await Market.findById(manualId);
