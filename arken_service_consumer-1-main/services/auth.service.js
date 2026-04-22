@@ -2766,7 +2766,7 @@ async function userbetplaceHandler(data) {
     };
   } catch (error) {
     console.error("Place bet error:", error);
-    return { success: false, code: 500, message: "Server error" };
+    return { success: false, code: 500, message: error.message || "Server error" };
   }
 }
 
