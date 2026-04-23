@@ -86,9 +86,11 @@ export const SolLogo = () => (
 );
 export const ArbLogo = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" fill="#213147"/>
-    <circle cx="12" cy="12" r="10" stroke="#28A0F0" strokeWidth="1.2" fill="none"/>
-    <path d="M9.5 16L12 8.5l2 5h-4" stroke="#28A0F0" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M13.5 13.5L14.5 16" stroke="#96BEDC" strokeWidth="1.5" strokeLinecap="round"/>
+    <polygon points="12,2 20,8 20,16 12,22 4,16 4,8" fill="#627EEA" opacity="0.15"/>
+    <polygon points="12,2 20,8 20,16 12,22 4,16 4,8" stroke="#627EEA" strokeWidth="1.2" fill="none"/>
+    <polygon points="12,5 17.5,9 12,12.5" fill="#627EEA"/>
+    <polygon points="12,5 6.5,9 12,12.5" fill="#9DB3F5"/>
+    <polygon points="12,13.5 17.5,10 12,19" fill="#627EEA"/>
+    <polygon points="12,13.5 6.5,10 12,19" fill="#9DB3F5"/>
   </svg>
 );

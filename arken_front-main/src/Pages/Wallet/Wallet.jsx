@@ -426,7 +426,7 @@ const Wallet = () => {
           <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 14 }}>SUPPORTED NETWORKS</div>
           <div style={{ display: 'flex', gap: 12 }}>
             {[
-              { Logo: ArbLogo, name: 'Arb', color: '#28A0F0', balance: evmBalance },
+              { Logo: ArbLogo, name: 'ETH', color: '#627EEA', balance: evmBalance },
               { Logo: SolLogo, name: 'Sol', color: '#9945FF', balance: solBalance },
             ].map((n, i) => (
               <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, background: C.surface, borderRadius: 12, padding: '14px 10px', border: `1px solid ${C.border}` }}>
