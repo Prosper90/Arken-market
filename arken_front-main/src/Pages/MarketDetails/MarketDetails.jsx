@@ -936,7 +936,8 @@ const MarketDetails = () => {
                     <div style={{ display: 'flex', alignItems: 'center', background: C.surface, borderRadius: 12, padding: '10px 14px', border: `1px solid ${C.border}` }}>
                       {(() => {
                         const amt = parseFloat(swapAmt) || 0;
-                        const price = swapOutcome === 'yes' ? yesPercent / 100 : noPercent / 100;
+                        const rawPrice = swapOutcome === 'yes' ? yesPercent / 100 : noPercent / 100;
+                        const price = Math.max(0.01, rawPrice);
                         const out = amt > 0
                           ? swapSide === 'buy'
                             ? (amt / price).toFixed(2)

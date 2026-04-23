@@ -292,22 +292,21 @@ const Profile = () => {
                   {item.unrealizedPnl !== undefined && <div><span style={{ color: C.muted }}>P&L: </span><span style={{ fontWeight: 700, color: item.unrealizedPnl >= 0 ? C.green : C.red }}>{item.unrealizedPnl >= 0 ? '+' : ''}${Number(item.unrealizedPnl).toFixed(4)}</span></div>}
                 </div>
                 {item.type !== 'lp' && (
-                  item.source === 'arken' ? (
+                  <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      onClick={() => setSellModalBet(item)}
-                      style={{ width: '100%', background: 'rgba(255,165,0,0.12)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)', borderRadius: 10, padding: '9px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                      onClick={() => navigate(`/market-details/${item.manualId || item.marketId || item._id}`)}
+                      style={{ flex: 1, background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 10, padding: '9px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Sell Position
+                      👁 View
                     </button>
-                  ) : (
                     <button
-                      disabled={cashoutLoadingId === item._id}
-                      onClick={() => handleCashout(item._id)}
-                      style={{ width: '100%', background: 'rgba(255,165,0,0.12)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)', borderRadius: 10, padding: '9px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: cashoutLoadingId === item._id ? 0.6 : 1 }}
+                      disabled={sellLoadingId === item._id}
+                      onClick={() => handleSellPosition(item._id)}
+                      style={{ flex: 1, background: 'rgba(255,165,0,0.12)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)', borderRadius: 10, padding: '9px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: sellLoadingId === item._id ? 0.6 : 1 }}
                     >
-                      {cashoutLoadingId === item._id ? 'Processing...' : 'Close Bet'}
+                      {sellLoadingId === item._id ? 'Closing...' : 'Close Bet'}
                     </button>
-                  )
+                  </div>
                 )}
               </div>
             ))

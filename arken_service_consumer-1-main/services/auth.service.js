@@ -2860,19 +2860,36 @@ async function getActiveBetsForUserHandler(data) {
 
     const manualMarkets = await markets
       .find({ _id: { $in: manualMarketIds } })
-      .select("question")
+      .select("question marketStatus chancePercents outcomePrices")
       .lean();
 
     const manualMarketMap = {};
     manualMarkets.forEach((m) => {
-      manualMarketMap[m._id.toString()] = m.question;
+      manualMarketMap[m._id.toString()] = m;
     });
 
-    const finalData = activeBets.map((bet) => ({
-      ...bet,
-      type: "bet",
-      question: bet.question || manualMarketMap[bet.manualId?.toString()] || "",
-    }));
+    // Filter out bets on closed/resolved markets and compute live P&L
+    const finalData = activeBets
+      .filter((bet) => {
+        if (!bet.manualId) return true; // poly bets — keep
+        const mkt = manualMarketMap[bet.manualId.toString()];
+        if (!mkt) return true;
+        return !['closed', 'resolved', 'settled'].includes((mkt.marketStatus || '').toLowerCase());
+      })
+      .map((bet) => {
+        const mkt = bet.manualId ? manualMarketMap[bet.manualId.toString()] : null;
+        const question = bet.question || mkt?.question || "";
+        let unrealizedPnl = 0;
+        if (mkt?.chancePercents?.length > 0 && bet.outcomeIndex !== undefined) {
+          const currentOdds = (mkt.chancePercents[bet.outcomeIndex] ?? 50) / 100;
+          const initialOdds = Number(bet.odds) || 0.5;
+          const amount = Number(bet.amount) || 0;
+          const shares = initialOdds > 0 ? amount / initialOdds : 0;
+          const currentValue = shares * currentOdds;
+          unrealizedPnl = parseFloat((currentValue - amount).toFixed(4));
+        }
+        return { ...bet, type: "bet", question, unrealizedPnl };
+      });
 
     // Fetch LP positions for this user
     const lpMarkets = await Market.find({
