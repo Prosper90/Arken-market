@@ -410,19 +410,38 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referr
   const usdcMint    = new PublicKey(USDC_MINT_STR);
   const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
 
-  const txHash = await program.methods
-    .placeBet({ marketId: marketIdArray, option: optionIndex, amount: amountLamports, referrer: referrerPubkey })
-    .accounts({
-      user: keypair.publicKey,
-      market: marketPda,
-      position: positionPda,
-      vault: vaultPda,
-      userUsdcAccount: userUsdcAta,
-      usdcMint,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
+  let txHash;
+  try {
+    txHash = await program.methods
+      .placeBet({ marketId: marketIdArray, option: optionIndex, amount: amountLamports, referrer: referrerPubkey })
+      .accounts({
+        user: keypair.publicKey,
+        market: marketPda,
+        position: positionPda,
+        vault: vaultPda,
+        userUsdcAccount: userUsdcAta,
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  } catch (err) {
+    if (err.name === 'TransactionExpiredTimeoutError' || err.message?.includes('Transaction was not confirmed')) {
+      // tx was submitted but confirmation timed out — check on-chain before giving up
+      const sig = err.signature || (err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0]);
+      if (sig) {
+        await new Promise(r => setTimeout(r, 5000));
+        const statuses = await connection.getSignatureStatuses([sig]);
+        const status = statuses?.value?.[0];
+        if (status && !status.err) {
+          console.log("[ArkenSolana] Tx confirmed after timeout check. TxHash:", sig);
+          return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+        }
+      }
+      throw new Error("Your bet transaction timed out on Solana testnet. The network may be congested — please try again in a moment.");
+    }
+    throw err;
+  }
 
   console.log("[ArkenSolana] Bet placed. TxHash:", txHash);
   return { txHash, walletAddress: keypair.publicKey.toBase58() };
@@ -466,19 +485,37 @@ async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer })
   const usdcMint    = new PublicKey(USDC_MINT_STR);
   const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
 
-  const txHash = await program.methods
-    .sellOption({ marketId: marketIdArray, sellPercentage: pct, referrer: referrerPubkey })
-    .accounts({
-      user: keypair.publicKey,
-      market: marketPda,
-      position: positionPda,
-      vault: vaultPda,
-      userUsdcAccount: userUsdcAta,
-      usdcMint,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-    })
-    .rpc();
+  let txHash;
+  try {
+    txHash = await program.methods
+      .sellOption({ marketId: marketIdArray, sellPercentage: pct, referrer: referrerPubkey })
+      .accounts({
+        user: keypair.publicKey,
+        market: marketPda,
+        position: positionPda,
+        vault: vaultPda,
+        userUsdcAccount: userUsdcAta,
+        usdcMint,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  } catch (err) {
+    if (err.name === 'TransactionExpiredTimeoutError' || err.message?.includes('Transaction was not confirmed')) {
+      const sig = err.signature || (err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0]);
+      if (sig) {
+        await new Promise(r => setTimeout(r, 5000));
+        const statuses = await connection.getSignatureStatuses([sig]);
+        const status = statuses?.value?.[0];
+        if (status && !status.err) {
+          console.log("[ArkenSolana] Sell tx confirmed after timeout check. TxHash:", sig);
+          return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+        }
+      }
+      throw new Error("Your sell transaction timed out on Solana testnet. The network may be congested — please try again in a moment.");
+    }
+    throw err;
+  }
 
   console.log(`[ArkenSolana] Position sold (${pct}%). TxHash:`, txHash);
   return { txHash, walletAddress: keypair.publicKey.toBase58() };

@@ -287,7 +287,7 @@ const MarketDetails = () => {
       : swapOutcome === 'yes' ? 0 : 1;
     const outcomeLabel = outcomes[idx] ?? outcomes[0];
     const yesP = market?.chancePercents?.[0] ? market.chancePercents[0] / 100 : 0.5;
-    const odds = swapOutcome === 'yes' ? yesP : 1 - yesP;
+    const odds = Math.max(0.01, swapOutcome === 'yes' ? yesP : 1 - yesP);
     const payload = {
       ...(token ? { token } : { initData: telegramUser?.intData || window.Telegram?.WebApp?.initData }),
       marketId: market.specifyId || null,

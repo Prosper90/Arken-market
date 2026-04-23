@@ -39,6 +39,7 @@ const Profile = () => {
   const [loadingMyMarkets, setLoadingMyMarkets] = useState(false);
   const [closingMarketId, setClosingMarketId] = useState(null);
   const [sellModalBet, setSellModalBet] = useState(null); // bet object to sell
+  const [confirmSellBet, setConfirmSellBet] = useState(null); // pending confirm
 
   // Email linking state
   const [emailInput, setEmailInput] = useState('');
@@ -301,7 +302,7 @@ const Profile = () => {
                     </button>
                     <button
                       disabled={sellLoadingId === item._id}
-                      onClick={() => handleSellPosition(item._id)}
+                      onClick={() => setConfirmSellBet(item)}
                       style={{ flex: 1, background: 'rgba(255,165,0,0.12)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.3)', borderRadius: 10, padding: '9px 0', fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: sellLoadingId === item._id ? 0.6 : 1 }}
                     >
                       {sellLoadingId === item._id ? 'Closing...' : 'Close Bet'}
@@ -596,6 +597,36 @@ const Profile = () => {
           )}
         </Box>
       </Modal>
+
+      {/* Close Bet Confirm Modal */}
+      {confirmSellBet && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', padding: '0 20px' }} onClick={() => setConfirmSellBet(null)}>
+          <div style={{ background: '#1a1a2e', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 20, padding: 24, width: '100%', maxWidth: 360 }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 28, textAlign: 'center', marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontWeight: 800, fontSize: 17, textAlign: 'center', marginBottom: 8 }}>Close Bet?</div>
+            <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', lineHeight: 1.6, marginBottom: 20 }}>
+              You are about to sell all your shares in<br />
+              <strong style={{ color: '#e2e8f0' }}>{confirmSellBet.question}</strong>.<br />
+              You will receive the current market value. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setConfirmSellBet(null)}
+                style={{ flex: 1, background: 'transparent', color: '#9ca3af', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, padding: '12px 0', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={sellLoadingId === confirmSellBet._id}
+                onClick={() => { handleSellPosition(confirmSellBet._id); setConfirmSellBet(null); }}
+                style={{ flex: 1, background: 'rgba(255,165,0,0.15)', color: '#FFA500', border: '1px solid rgba(255,165,0,0.4)', borderRadius: 12, padding: '12px 0', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}
+              >
+                Yes, Close Bet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
