@@ -427,18 +427,23 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referr
       .rpc();
   } catch (err) {
     if (err.name === 'TransactionExpiredTimeoutError' || err.message?.includes('Transaction was not confirmed')) {
-      // tx was submitted but confirmation timed out — check on-chain before giving up
-      const sig = err.signature || (err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0]);
+      const sig = err.signature || err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0];
       if (sig) {
-        await new Promise(r => setTimeout(r, 5000));
-        const statuses = await connection.getSignatureStatuses([sig]);
-        const status = statuses?.value?.[0];
-        if (status && !status.err) {
-          console.log("[ArkenSolana] Tx confirmed after timeout check. TxHash:", sig);
-          return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(r => setTimeout(r, 8000));
+          const statuses = await connection.getSignatureStatuses([sig]);
+          const status = statuses?.value?.[0];
+          if (status && !status.err) {
+            console.log(`[ArkenSolana] Bet tx confirmed on attempt ${attempt}. TxHash:`, sig);
+            return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+          }
+          console.log(`[ArkenSolana] Bet tx not yet confirmed (attempt ${attempt}/3)`);
         }
       }
       throw new Error("Your bet transaction timed out on Solana testnet. The network may be congested — please try again in a moment.");
+    }
+    if (err.error?.errorCode?.code === 'InvalidOption') {
+      throw new Error("This market does not support the selected outcome on-chain. It may have been created with only one outcome. Please contact support or try a different market.");
     }
     throw err;
   }
@@ -502,14 +507,17 @@ async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer })
       .rpc();
   } catch (err) {
     if (err.name === 'TransactionExpiredTimeoutError' || err.message?.includes('Transaction was not confirmed')) {
-      const sig = err.signature || (err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0]);
+      const sig = err.signature || err.message?.match(/[1-9A-HJ-NP-Za-km-z]{87,88}/)?.[0];
       if (sig) {
-        await new Promise(r => setTimeout(r, 5000));
-        const statuses = await connection.getSignatureStatuses([sig]);
-        const status = statuses?.value?.[0];
-        if (status && !status.err) {
-          console.log("[ArkenSolana] Sell tx confirmed after timeout check. TxHash:", sig);
-          return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          await new Promise(r => setTimeout(r, 8000));
+          const statuses = await connection.getSignatureStatuses([sig]);
+          const status = statuses?.value?.[0];
+          if (status && !status.err) {
+            console.log(`[ArkenSolana] Sell tx confirmed on attempt ${attempt}. TxHash:`, sig);
+            return { txHash: sig, walletAddress: keypair.publicKey.toBase58() };
+          }
+          console.log(`[ArkenSolana] Sell tx not yet confirmed (attempt ${attempt}/3)`);
         }
       }
       throw new Error("Your sell transaction timed out on Solana testnet. The network may be congested — please try again in a moment.");
