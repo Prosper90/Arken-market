@@ -254,6 +254,7 @@ const IDL = {
         kind: "struct",
         fields: [
           { name: "marketId",       type: { array: ["u8", 32] } },
+          { name: "option",         type: "u8" },
           { name: "sellPercentage", type: "u8" },
           { name: "referrer",       type: "publicKey" },
         ],
