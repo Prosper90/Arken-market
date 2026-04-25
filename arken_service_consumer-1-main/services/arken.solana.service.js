@@ -346,9 +346,9 @@ function deriveVaultPDA(marketPda) {
   );
 }
 
-function derivePositionPDA(marketPda, userPubkey) {
+function derivePositionPDA(marketPda, userPubkey, optionIndex = 0) {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("position"), marketPda.toBuffer(), userPubkey.toBuffer()],
+    [Buffer.from("position"), marketPda.toBuffer(), userPubkey.toBuffer(), Buffer.from([optionIndex])],
     new PublicKey(PROGRAM_ID_STR)
   );
 }
@@ -405,7 +405,7 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referr
 
   const [marketPda]   = deriveMarketPDA(marketIdArray);
   const [vaultPda]    = deriveVaultPDA(marketPda);
-  const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey);
+  const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey, optionIndex);
 
   const usdcMint    = new PublicKey(USDC_MINT_STR);
   const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
@@ -457,10 +457,11 @@ async function placeBet({ privateKey, mongodbId, optionIndex, amountUsdc, referr
 /**
  * @param {string} params.privateKey       - User's Solana private key
  * @param {string} params.mongodbId        - Market MongoDB _id
+ * @param {number} params.optionIndex      - Outcome index of the position to sell (0=Yes, 1=No)
  * @param {number} [params.sellPercentage] - 1-100, default 100 (full sell)
  * @param {string} [params.referrer]       - Referrer pubkey (base58)
  */
-async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer }) {
+async function sellPosition({ privateKey, mongodbId, optionIndex = 0, sellPercentage, referrer }) {
   if (!isDeployed()) {
     console.warn("[ArkenSolana] Program not deployed — skipping sell");
     return null;
@@ -483,9 +484,11 @@ async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer })
     : 100;
   const referrerPubkey = referrer ? new PublicKey(referrer) : ZERO_PUBKEY;
 
+  const optionIdx = Number(optionIndex);
+
   const [marketPda]   = deriveMarketPDA(marketIdArray);
   const [vaultPda]    = deriveVaultPDA(marketPda);
-  const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey);
+  const [positionPda] = derivePositionPDA(marketPda, keypair.publicKey, optionIdx);
 
   const usdcMint    = new PublicKey(USDC_MINT_STR);
   const userUsdcAta = await getAssociatedTokenAddress(usdcMint, keypair.publicKey);
@@ -493,7 +496,7 @@ async function sellPosition({ privateKey, mongodbId, sellPercentage, referrer })
   let txHash;
   try {
     txHash = await program.methods
-      .sellOption({ marketId: marketIdArray, sellPercentage: pct, referrer: referrerPubkey })
+      .sellOption({ marketId: marketIdArray, option: optionIdx, sellPercentage: pct, referrer: referrerPubkey })
       .accounts({
         user: keypair.publicKey,
         market: marketPda,

@@ -2572,24 +2572,8 @@ async function userbetplaceHandler(data) {
 
       const userPrivateKey = await common.decrypt(solWallet.privateKey);
 
-      // 2b. Check for conflicting open position on same market (contract enforces single-side per user)
-      const outcomeIdx = Number(outcomeIndex);
-      const existingPosition = await Prediction.findOne({
-        telegramId: String(telegramId),
-        manualId: manualId.toString(),
-        status: 'OPEN',
-      }).select('outcomeIndex outcomeLabel').lean();
-      if (existingPosition && existingPosition.outcomeIndex !== outcomeIdx) {
-        const heldSide = existingPosition.outcomeLabel || (existingPosition.outcomeIndex === 0 ? 'YES' : 'NO');
-        const triedSide = outcomeIdx === 0 ? 'YES' : 'NO';
-        return {
-          success: false,
-          code: 400,
-          message: `You already hold a ${heldSide} position on this market. The Solana contract only allows one side per market. Close your ${heldSide} position first, or add more ${heldSide} shares.`,
-        };
-      }
-
       // 3. Place bet on-chain
+      const outcomeIdx = Number(outcomeIndex);
       console.log(`[placeBet-SOL] User ${telegramId} betting $${amountNum} on option ${outcomeIdx} in market ${manualId}`);
       const solResult = await arkenSolana.placeBet({
         privateKey: userPrivateKey,
@@ -7251,10 +7235,11 @@ async function sellPositionHandler(data) {
       if (!arkenSolana.isDeployed()) {
         return { status: false, message: "Solana program not deployed" };
       }
-      console.log(`[sellPosition] Solana: User ${telegramId} selling ${pct}% of market ${market._id}`);
+      console.log(`[sellPosition] Solana: User ${telegramId} selling ${pct}% of option ${prediction.outcomeIndex} in market ${market._id}`);
       const solResult = await arkenSolana.sellPosition({
         privateKey: userPrivateKey,
         mongodbId: market._id.toString(),
+        optionIndex: Number(prediction.outcomeIndex),
         sellPercentage: pct,
       });
       txHash  = solResult.txHash;
