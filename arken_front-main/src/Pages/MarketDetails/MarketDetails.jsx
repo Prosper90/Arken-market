@@ -166,8 +166,8 @@ const MarketDetails = () => {
   const [showProposeModal, setShowProposeModal] = useState(false);
   const [proposeLoading, setProposeLoading] = useState(false);
 
-  // User's existing position in this market (for sell tab)
-  const [userPosition, setUserPosition] = useState(null);
+  // User's existing positions in this market (array — one per outcome)
+  const [userPositions, setUserPositions] = useState([]);
 
   // Bottom swap sheet
   const [swapOpen, setSwapOpen] = useState(false);
@@ -321,9 +321,11 @@ const MarketDetails = () => {
   };
 
   const handleDirectSell = async () => {
-    if (!userPosition?._id) return toast.error('No open position found');
+    const outcomeIdx = swapOutcome === 'yes' ? 0 : 1;
+    const activePosition = userPositions.find(p => p.outcomeIndex === outcomeIdx);
+    if (!activePosition?._id) return toast.error('No open position found for this outcome');
     if (!telegramId) return toast.error('Not authenticated');
-    const positionSize = userPosition?.amount || userPosition?.betAmount || 0;
+    const positionSize = activePosition?.amount || activePosition?.betAmount || 0;
     const enteredAmt = parseFloat(swapAmt) || 0;
     // Convert dollar amount → sell percentage (capped 1–100)
     const pct = positionSize > 0
@@ -333,7 +335,7 @@ const MarketDetails = () => {
     try {
       const resp = await postMethod({
         apiUrl: apiService.sellPosition,
-        payload: { telegramId, predictionId: userPosition._id, sellPercentage: pct },
+        payload: { telegramId, predictionId: activePosition._id, sellPercentage: pct },
       });
       if (resp?.status || resp?.success) {
         const payout = resp.payout ? `$${Number(resp.payout).toFixed(4)}` : '';
@@ -343,7 +345,7 @@ const MarketDetails = () => {
         );
         setSwapOpen(false);
         setSwapAmt('');
-        setUserPosition(null);
+        setUserPositions(prev => prev.filter(p => p._id !== activePosition._id));
         fetchMarketById();
       } else {
         toast.error(resp?.message || 'Failed to sell position');
@@ -385,17 +387,17 @@ const MarketDetails = () => {
     setGroupId(tg.initDataUnsafe?.chat?.id || null);
   }, []);
 
-  // Once market + telegramId are known, find the user's active position in this market
+  // Once market + telegramId are known, find all of the user's active positions in this market
   useEffect(() => {
     if (!market || !telegramId) return;
     postMethod({ apiUrl: apiService.activebets, payload: { telegramId } })
       .then(resp => {
         if (resp.success && Array.isArray(resp.data)) {
           const marketIdStr = market._id?.toString();
-          const pos = resp.data.find(b =>
+          const positions = resp.data.filter(b =>
             String(b.manualId) === marketIdStr || String(b.marketId) === marketIdStr
           );
-          setUserPosition(pos || null);
+          setUserPositions(positions);
         }
       })
       .catch(() => {});
@@ -753,44 +755,60 @@ const MarketDetails = () => {
         )}
 
         {/* YOUR POSITION */}
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1, marginBottom: 12 }}>YOUR POSITION</div>
-          {userPosition ? (
-            isMulti ? (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{userPosition.outcome || 'Unknown'}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Outcome</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: C.purpleL }}>${(userPosition.betAmount || userPosition.amount || 0).toFixed(2)}</div>
-                  <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Staked</div>
-                </div>
+        {(() => {
+          const yesPos = userPositions.find(p => p.outcomeIndex === 0);
+          const noPos  = userPositions.find(p => p.outcomeIndex === 1);
+          const totalStaked = userPositions.reduce((sum, p) => sum + (p.betAmount || p.amount || 0), 0);
+          return (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, letterSpacing: 1 }}>YOUR POSITION</div>
+                {userPositions.length > 0 && (
+                  <div style={{ fontSize: 11, color: C.muted }}>Total: <span style={{ color: C.text, fontWeight: 700 }}>${totalStaked.toFixed(2)}</span></div>
+                )}
               </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div style={{ background: `${C.green}10`, border: `1px solid ${C.green}20`, borderRadius: 12, padding: '12px 14px', textAlign: 'center' }}>
-                  <div style={{ color: C.muted, fontSize: 11 }}>YES Shares</div>
-                  <div style={{ fontWeight: 800, fontSize: 20, color: C.green, marginTop: 4 }}>
-                    {userPosition.outcomeIndex === 0 ? (userPosition.betAmount || userPosition.amount || 0).toFixed(2) : '0'}
+              {userPositions.length > 0 ? (
+                isMulti ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {userPositions.map((pos, i) => (
+                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{pos.outcome || 'Unknown'}</div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Outcome</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 16, fontWeight: 800, color: C.purpleL }}>${(pos.betAmount || pos.amount || 0).toFixed(2)}</div>
+                          <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Staked</div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>USDC value</div>
-                </div>
-                <div style={{ background: `${C.red}10`, border: `1px solid ${C.red}20`, borderRadius: 12, padding: '12px 14px', textAlign: 'center' }}>
-                  <div style={{ color: C.muted, fontSize: 11 }}>NO Shares</div>
-                  <div style={{ fontWeight: 800, fontSize: 20, color: C.red, marginTop: 4 }}>
-                    {userPosition.outcomeIndex === 1 ? (userPosition.betAmount || userPosition.amount || 0).toFixed(2) : '0'}
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div style={{ background: `${C.green}10`, border: `1px solid ${yesPos ? C.green : C.border}20`, borderRadius: 12, padding: '12px 14px', textAlign: 'center', opacity: yesPos ? 1 : 0.4 }}>
+                      <div style={{ color: C.muted, fontSize: 11 }}>YES Shares</div>
+                      <div style={{ fontWeight: 800, fontSize: 20, color: C.green, marginTop: 4 }}>
+                        {(yesPos?.betAmount || yesPos?.amount || 0).toFixed(2)}
+                      </div>
+                      <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>USDC value</div>
+                    </div>
+                    <div style={{ background: `${C.red}10`, border: `1px solid ${noPos ? C.red : C.border}20`, borderRadius: 12, padding: '12px 14px', textAlign: 'center', opacity: noPos ? 1 : 0.4 }}>
+                      <div style={{ color: C.muted, fontSize: 11 }}>NO Shares</div>
+                      <div style={{ fontWeight: 800, fontSize: 20, color: C.red, marginTop: 4 }}>
+                        {(noPos?.betAmount || noPos?.amount || 0).toFixed(2)}
+                      </div>
+                      <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>USDC value</div>
+                    </div>
                   </div>
-                  <div style={{ color: C.muted, fontSize: 11, marginTop: 2 }}>USDC value</div>
+                )
+              ) : (
+                <div style={{ textAlign: 'center', padding: '12px 0', color: C.muted, fontSize: 13 }}>
+                  No position yet. Buy an outcome above!
                 </div>
-              </div>
-            )
-          ) : (
-            <div style={{ textAlign: 'center', padding: '12px 0', color: C.muted, fontSize: 13 }}>
-              No position yet. Buy an outcome above!
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* About */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px 16px', marginBottom: 14, fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
@@ -849,7 +867,7 @@ const MarketDetails = () => {
                 {['buy', 'sell'].map(s => {
                   const active = swapSide === s;
                   const col = s === 'buy' ? C.green : C.red;
-                  const disabled = s === 'sell' && !userPosition;
+                  const disabled = s === 'sell' && userPositions.length === 0;
                   return (
                     <button key={s} onClick={() => !disabled && setSwapSide(s)} style={{ padding: '12px 0', background: active ? `${col}12` : 'transparent', border: 'none', borderBottom: active ? `2px solid ${col}` : '2px solid transparent', color: active ? col : (disabled ? C.border : C.muted), fontWeight: 700, fontSize: 14, cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>
                       {s === 'buy' ? 'Buy' : 'Sell'}
@@ -979,34 +997,39 @@ const MarketDetails = () => {
                 )}
 
                 {/* Confirm button — executes buy or sell directly, no second modal */}
-                <button
-                  disabled={buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || (swapSide === 'sell' && !userPosition)}
-                  onClick={() => {
-                    if (swapSide === 'sell') handleDirectSell();
-                    else handleDirectBuy();
-                  }}
-                  style={{
-                    width: '100%',
-                    background: (buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || (swapSide === 'sell' && !userPosition)) ? C.border
-                      : swapSide === 'buy'
-                        ? swapOutcome === 'yes' ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #dc2626, #b91c1c)'
-                        : `linear-gradient(135deg, ${C.purple}, #4f46e5)`,
-                    color: (buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || (swapSide === 'sell' && !userPosition)) ? C.muted : '#fff',
-                    border: 'none',
-                    borderRadius: 14,
-                    padding: '13px 0',
-                    fontWeight: 700,
-                    fontSize: 15,
-                    cursor: (buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || (swapSide === 'sell' && !userPosition)) ? 'not-allowed' : 'pointer',
-                    opacity: (buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || (swapSide === 'sell' && !userPosition)) ? 0.5 : 1,
-                  }}
-                >
-                  {buyLoading ? 'Placing Bet...'
-                    : sellLoading ? 'Selling...'
-                    : swapSide === 'buy' ? `Buy ${swapOutcome.toUpperCase()} Shares`
-                    : userPosition ? `Sell ${swapOutcome.toUpperCase()} Shares`
-                    : 'No Position to Sell'}
-                </button>
+                {(() => {
+                  const outcomeIdx = swapOutcome === 'yes' ? 0 : 1;
+                  const activePosition = userPositions.find(p => p.outcomeIndex === outcomeIdx);
+                  const noSellPosition = swapSide === 'sell' && !activePosition;
+                  const isDisabled = buyLoading || sellLoading || !swapAmt || parseFloat(swapAmt) <= 0 || noSellPosition;
+                  return (
+                    <button
+                      disabled={isDisabled}
+                      onClick={() => { if (swapSide === 'sell') handleDirectSell(); else handleDirectBuy(); }}
+                      style={{
+                        width: '100%',
+                        background: isDisabled ? C.border
+                          : swapSide === 'buy'
+                            ? swapOutcome === 'yes' ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                            : `linear-gradient(135deg, ${C.purple}, #4f46e5)`,
+                        color: isDisabled ? C.muted : '#fff',
+                        border: 'none',
+                        borderRadius: 14,
+                        padding: '13px 0',
+                        fontWeight: 700,
+                        fontSize: 15,
+                        cursor: isDisabled ? 'not-allowed' : 'pointer',
+                        opacity: isDisabled ? 0.5 : 1,
+                      }}
+                    >
+                      {buyLoading ? 'Placing Bet...'
+                        : sellLoading ? 'Selling...'
+                        : swapSide === 'buy' ? `Buy ${swapOutcome.toUpperCase()} Shares`
+                        : activePosition ? `Sell ${swapOutcome.toUpperCase()} Shares`
+                        : `No ${swapOutcome.toUpperCase()} Position`}
+                    </button>
+                  );
+                })()}
 
                 <div style={{ textAlign: 'center', marginTop: 10, fontSize: 11, color: C.muted }}>
                   Powered by AMM — prices move with pool liquidity
